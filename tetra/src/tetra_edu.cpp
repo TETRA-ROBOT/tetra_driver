@@ -221,8 +221,8 @@ public:
 
 		int iData1 = 1000.0 * RPM_to_ms(Left_Wheel_vel);
 		int iData2 = 1000.0 * RPM_to_ms(Right_Wheel_vel);
-		dssp_rs232_drv_module_set_velocity2(iData1, iData2, &m_dX_pos, &m_dY_pos, &m_dTheta, &m_dVelocity_l, &m_dVelocity_a, &m_bumper_data, &m_emg_state);
-		//dssp_rs232_drv_module_set_velocity(iData1, iData2);//ASCII Command
+		dssp_rs232_drv_module_set_velocity(iData1, iData2);
+		//dssp_rs232_drv_module_set_velocity2(iData1, iData2, &m_dX_pos, &m_dY_pos, &m_dTheta, &m_dVelocity_l, &m_dVelocity_a, &m_bumper_data, &m_emg_state);
 	}
 
 	
