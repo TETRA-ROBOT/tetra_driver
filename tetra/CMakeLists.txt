@@ -48,6 +48,7 @@ add_executable(tetra_h src/tetra_h.cpp include/rs232.c include/rs232.h include/r
 add_executable(tetra_edu src/tetra_edu.cpp include/rs232.c include/rs232.h include/rs232_common.c include/rs232_common.h src/drive_module.c src/drive_module.h src/dssp_rs232_drive_module.c src/dssp_rs232_drive_module.h)
 add_executable(tetra_mh src/tetra_mh.cpp include/rs232.c include/rs232.h include/rs232_common.c include/rs232_common.h src/drive_module.c src/drive_module.h src/dssp_rs232_drive_module.c src/dssp_rs232_drive_module.h)
 add_executable(tetra_s src/tetra_s.cpp include/rs232.c include/rs232.h include/rs232_common.c include/rs232_common.h src/drive_module.c src/drive_module.h src/dssp_rs232_drive_module.c src/dssp_rs232_drive_module.h)
+add_executable(tetra_sm src/tetra_sm.cpp include/rs232.c include/rs232.h include/rs232_common.c include/rs232_common.h src/drive_module.c src/drive_module.h src/dssp_rs232_drive_module.c src/dssp_rs232_drive_module.h)
 
 set(dependencies
   rclcpp
@@ -68,6 +69,7 @@ ament_target_dependencies(tetra_h ${dependencies})
 ament_target_dependencies(tetra_edu ${dependencies})
 ament_target_dependencies(tetra_mh ${dependencies})
 ament_target_dependencies(tetra_s ${dependencies})
+ament_target_dependencies(tetra_sm ${dependencies})
 
 target_link_libraries(tetra_m
                       ${rclcpp_LIBRARIES}
@@ -123,9 +125,20 @@ target_link_libraries(tetra_s
                       ${tf2_ros_LIBRARIES}
                       ${nav_msgs_LIBRARIES}
                       ${geometry_msgs_LIBRARIES})
+
+target_link_libraries(tetra_sm
+                      ${rclcpp_LIBRARIES}
+                      ${rmw_implementation_LIBRARIES}
+                      ${std_msgs_LIBRARIES}
+                      ${std_srvs_LIBRARIES}
+                      ${sensor_msgs_LIBRARIES}
+                      ${tf2_LIBRARIES}
+                      ${tf2_ros_LIBRARIES}
+                      ${nav_msgs_LIBRARIES}
+                      ${geometry_msgs_LIBRARIES})
                       
 install(TARGETS 
-	tetra_m tetra_h tetra_edu tetra_mh tetra_s
+	tetra_m tetra_h tetra_edu tetra_mh tetra_s tetra_sm
 	DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY
