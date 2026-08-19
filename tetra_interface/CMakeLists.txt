@@ -47,6 +47,7 @@ add_definitions(${PCL_DEFINITIONS})
 add_executable(tetra_m_interface include/rs232.c include/rs232.h include/rs232_common.c include/rs232_common.h src/power_module.c src/power_module.h src/dssp_rs232_power_module.c src/dssp_rs232_power_module.h src/tetra_m_interface.cpp)
 add_executable(tetra_h_interface include/rs232.c include/rs232.h include/rs232_common.c include/rs232_common.h src/power_module.c src/power_module.h src/dssp_rs232_power_module.c src/dssp_rs232_power_module.h src/tetra_h_interface.cpp)
 add_executable(tetra_edu_interface include/rs232.c include/rs232.h include/rs232_common.c include/rs232_common.h src/power_module.c src/power_module.h src/dssp_rs232_power_module.c src/dssp_rs232_power_module.h src/tetra_edu_interface.cpp)
+add_executable(tetra_mh_interface include/rs232.c include/rs232.h include/rs232_common.c include/rs232_common.h src/power_module.c src/power_module.h src/dssp_rs232_power_module.c src/dssp_rs232_power_module.h src/tetra_mh_interface.cpp)
 
 set(dependencies
   rclcpp
@@ -62,6 +63,7 @@ set(dependencies
 ament_target_dependencies(tetra_m_interface ${dependencies})
 ament_target_dependencies(tetra_h_interface ${dependencies})
 ament_target_dependencies(tetra_edu_interface ${dependencies})
+ament_target_dependencies(tetra_mh_interface ${dependencies})
 
 target_link_libraries(tetra_m_interface
                       ${rclcpp_LIBRARIES}
@@ -89,9 +91,18 @@ target_link_libraries(tetra_edu_interface
                       ${sensor_msgs_LIBRARIES}
                       ${geometry_msgs_LIBRARIES}
                       ${PCL_LIBRARIES})
+
+target_link_libraries(tetra_mh_interface
+                      ${rclcpp_LIBRARIES}
+                      ${rmw_implementation_LIBRARIES}
+                      ${std_msgs_LIBRARIES}
+                      ${std_srvs_LIBRARIES}
+                      ${sensor_msgs_LIBRARIES}
+                      ${geometry_msgs_LIBRARIES}
+                      ${PCL_LIBRARIES})
                       
 install(TARGETS 
-	tetra_m_interface tetra_h_interface tetra_edu_interface
+	tetra_m_interface tetra_h_interface tetra_edu_interface tetra_mh_interface
 	DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY
