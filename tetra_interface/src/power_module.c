@@ -344,7 +344,7 @@ int power_read_tetra(int fd, double *dbattery, double *dVoltage, double *dCurren
 	ret = get_response2(fd, packet_buf);
 	if(packet_buf[1] == 0x02) //Packet Error Pass..
 	{
-		return -1;
+		return -3;
 	}
 	
 	//Battery Level
@@ -603,6 +603,7 @@ int  power_parameter_write(int fd, int id, int data)
 	int index;
 	unsigned char packet_buf[255] = {STX, 'P', 'W'};
 	unsigned char packet_buf2[255] = {STX, 'P', 'F', ETX};
+	printf("power_parameter_write fd: %d\n", fd);
 
 	if(!fd) return -1;
 
@@ -627,22 +628,30 @@ int  power_parameter_write(int fd, int id, int data)
 
 	packet_buf[index] = make_lrc(&packet_buf[1], index-1);
 	index++;
+	printf("packet_buf: %s\n", packet_buf);
 
 	ret = write(fd, packet_buf, index);
+	printf("power_parameter_write ret: %d\n", ret);
 	if(ret <= 0) return -2;
 	
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
 	ret = get_response(fd, packet_buf);
+	printf("power_parameter_write ret1: %d\n", ret);
 	if(ret) return -1;
 
 	packet_buf2[4] = make_lrc(&packet_buf2[1], 3);
+	printf("packet_buf2: %s\n", packet_buf2);
 	ret = write(fd, packet_buf2, 5);
+	
+	printf("power_parameter_write ret2: %d\n", ret);
 	if(ret <= 0) return -2;
 
 	
 	memset(packet_buf2, 0, sizeof(unsigned char)*255);
 	ret = get_response(fd, packet_buf2);
 	if(packet_buf2[1] == 0x30) ret = 0;
+	
+	printf("power_parameter_write ret3: %d\n", ret);
 
 	if(ret) return -1;
 	return ret;
@@ -1115,24 +1124,21 @@ int power_conveyor_movement(int fd, int mode)
 	unsigned char packet_buf[255] = {STX, 'C', 'N'};
 	
 	if(!fd) return -1;
+	printf("power_conveyor_movement mode: %d\n", mode);
 
-	if(mode == 1) //Start 
-	{
-		packet_buf[3] = '1';
-	}
-	else //Stop
-	{
-		packet_buf[3] = '0';
-	}
+	packet_buf[3]= mode+'0';
 	packet_buf[4] = ETX;
 	packet_buf[5] = make_lrc(&packet_buf[1], 4);
+	printf("packet_buf: %s\n", packet_buf);
 
 	ret = write(fd, packet_buf, 6);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
 	ret = get_response(fd, packet_buf);
-	//printf("packet_buf[1]: %02x \n", packet_buf[1]);
+	for (int i=0; i<255; i++){
+		if(packet_buf[i]!=0) printf("power_conveyor_movement packet_buf[%d]: %02x \n", i, packet_buf[i]);
+	}
 	return ret;
 }
 
@@ -1245,4 +1251,77 @@ int power_read_conveyor_movement(int fd, int* result)
 	*result = iInput;
 
 	return ret;
+}
+
+
+int power_read_motor_position(int fd, int* result)
+{
+	unsigned char packet_buf[255] = { STX, 'M','L', ETX };
+	int ret;
+	if (!fd) return -1;
+	packet_buf[4] = make_lrc(&packet_buf[1], 3);
+	ret = write(fd, packet_buf, 5);
+	if (ret <= 0) return -2;
+
+	memset(packet_buf, 0, sizeof(unsigned char) * 255);
+	ret = get_response(fd, packet_buf);
+
+	int combined = (packet_buf[3] << 8) | packet_buf[4];
+
+	*result = combined;
+
+	return ret;
+}
+
+int flexible_command(int fd, const char* cmd_str, char* out_str)
+{
+    unsigned char packet_buf[255];
+    int cmd_len = strlen(cmd_str);
+    int ret;
+
+    if (fd <= 0 || cmd_str == NULL || out_str == NULL) return -1;
+
+    // 1. 송신 패킷 구성 (STX + CMD + ETX + LRC)
+    packet_buf[0] = STX; 
+    memcpy(&packet_buf[1], cmd_str, cmd_len); // 명령어 복사
+    packet_buf[1 + cmd_len] = ETX;            // 명령어 바로 뒤에 ETX
+    
+    // LRC 계산 (STX 이후부터 ETX까지)
+    // 계산 범위: cmd_str (cmd_len개) + ETX (1개) = cmd_len + 1
+    packet_buf[2 + cmd_len] = make_lrc(&packet_buf[1], cmd_len + 1);
+
+    int send_len = cmd_len + 3; // STX(1) + CMD(n) + ETX(1) + LRC(1)
+    
+    // 데이터 전송
+    ret = write(fd, packet_buf, send_len);
+    if (ret <= 0) return -2;
+
+    // 2. 응답 수신 대기
+    memset(packet_buf, 0, sizeof(packet_buf));
+    // get_response는 실제로 읽은 바이트 수를 반환해야 합니다.
+    ret = get_response(fd, packet_buf); 
+	printf("ret2: %d \n", ret);
+    if (ret <= 0) return -3;
+
+    // 3. 수신 패킷 LRC 검증
+    // 수신 데이터: [STX] [DATA...] [ETX] [LRC]
+    // 마지막 바이트가 LRC, 그 앞이 ETX라고 가정
+    unsigned char received_lrc = packet_buf[ret - 1];
+    unsigned char calculated_lrc = make_lrc(&packet_buf[1], ret - 2);
+
+    if (received_lrc != calculated_lrc) {
+        fprintf(stderr, "LRC Checksum Error! (Recv: %02X, Calc: %02X)\n", received_lrc, calculated_lrc);
+        // 에러가 나더라도 어떤 데이터가 왔는지 확인하기 위해 문자열 변환은 계속 진행합니다.
+    }
+
+    // 4. 수신된 패킷을 16진수 문자열로 변환
+    out_str[0] = '\0'; // 결과 문자열 초기화
+    char temp[8];
+	printf("packet_buf: %s\n", packet_buf);
+    for (int i = 0; i < ret; i++) {
+        sprintf(temp, "%02X%s", packet_buf[i], (i == ret - 1) ? "" : " ");
+        strcat(out_str, temp);
+    }
+
+    return (received_lrc == calculated_lrc) ? 0 : -4;
 }

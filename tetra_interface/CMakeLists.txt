@@ -44,7 +44,8 @@ include_directories(
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
-add_executable(tetra_interface include/rs232.c include/rs232.h include/rs232_common.c include/rs232_common.h src/power_module.c src/power_module.h src/dssp_rs232_power_module.c src/dssp_rs232_power_module.h src/tetra_interface.cpp)
+add_executable(tetra_m_interface include/rs232.c include/rs232.h include/rs232_common.c include/rs232_common.h src/power_module.c src/power_module.h src/dssp_rs232_power_module.c src/dssp_rs232_power_module.h src/tetra_m_interface.cpp)
+add_executable(tetra_h_interface include/rs232.c include/rs232.h include/rs232_common.c include/rs232_common.h src/power_module.c src/power_module.h src/dssp_rs232_power_module.c src/dssp_rs232_power_module.h src/tetra_h_interface.cpp)
 
 set(dependencies
   rclcpp
@@ -57,11 +58,19 @@ set(dependencies
   interfaces
 )
 
-ament_target_dependencies(${PROJECT_NAME}
-  ${dependencies}
-)
+ament_target_dependencies(tetra_m_interface ${dependencies})
+ament_target_dependencies(tetra_h_interface ${dependencies})
 
-target_link_libraries(${PROJECT_NAME}
+target_link_libraries(tetra_m_interface
+                      ${rclcpp_LIBRARIES}
+                      ${rmw_implementation_LIBRARIES}
+                      ${std_msgs_LIBRARIES}
+                      ${std_srvs_LIBRARIES}
+                      ${sensor_msgs_LIBRARIES}
+                      ${geometry_msgs_LIBRARIES}
+                      ${PCL_LIBRARIES})
+
+target_link_libraries(tetra_h_interface
                       ${rclcpp_LIBRARIES}
                       ${rmw_implementation_LIBRARIES}
                       ${std_msgs_LIBRARIES}
@@ -71,7 +80,7 @@ target_link_libraries(${PROJECT_NAME}
                       ${PCL_LIBRARIES})
                       
 install(TARGETS 
-	${PROJECT_NAME} 
+	tetra_m_interface tetra_h_interface
 	DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY

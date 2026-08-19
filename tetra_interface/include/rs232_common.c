@@ -123,38 +123,43 @@ void display_error_message(unsigned char flag)
 
 int get_response(int fd, unsigned char data[])
 {
-	int index;
-	int ret = 0;
+    int index;
+    int ret = 0;
 
-	do
-	{
-		ret = read(fd, data, 1);
-		if(ret <= 0) return -1;
-	} while(!(data[0] == STX));
-	index = 1;
-	
-	do
-	{
-		ret = read(fd, &data[index], 1);
-		index++;
-		if(ret <= 0) return -1;
-	} while(data[index - 2] != ETX);
-	
-	if(data[1] != FLAG_OK)
-		return -1;
-	else if(data[index-1] != make_lrc(&data[1], index - 2)) {
-		return -1;
-	}
-	else {
-		return 0;
-	}
+    // 1. STX 찾기
+    do {
+        ret = read(fd, data, 1);
+        if (ret <= 0) return -1;
+    } while (data[0] != STX);
+
+    index = 1;
+
+    // 2. ETX까지 읽기
+    do {
+        ret = read(fd, &data[index], 1);
+        if (ret <= 0) return -1;
+        index++;
+    } while (data[index - 2] != ETX);
+
+    // 3. FLAG 확인
+    //if (data[1] != FLAG_OK)
+    //    return -2;
+
+    // 4. LRC 검증
+    //unsigned char received_lrc = data[index - 1];
+    //unsigned char calculated_lrc = make_lrc(&data[1], index - 2);
+    //if (received_lrc != calculated_lrc)
+    //    return -3;
+
+    // 5. 성공 시 읽은 길이 반환
+    return index;
 }
+
 
 int get_response2(int fd, unsigned char data[])
 {
 	int index = 0;
 	int ret = 0;
-	int lrc_val = 0;
 	int total_byte = 0;
 	unsigned char tmp = 0;
 	// receive STX
@@ -199,4 +204,5 @@ int get_response2(int fd, unsigned char data[])
 		printf("LRC : %02x\n",tmp);
 		return -1;
 	}
+	return 0;
 }

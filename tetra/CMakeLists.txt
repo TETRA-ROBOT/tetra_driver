@@ -43,7 +43,8 @@ include_directories(
 		${nav_msgs_INCLUDE_DIRS}
 		${geometry_msgs_INCLUDE_DIRS})
 
-add_executable(tetra src/tetra.cpp include/rs232.c include/rs232.h include/rs232_common.c include/rs232_common.h src/drive_module.c src/drive_module.h src/dssp_rs232_drive_module.c src/dssp_rs232_drive_module.h)
+add_executable(tetra_m src/tetra_m.cpp include/rs232.c include/rs232.h include/rs232_common.c include/rs232_common.h src/drive_module.c src/drive_module.h src/dssp_rs232_drive_module.c src/dssp_rs232_drive_module.h)
+add_executable(tetra_h src/tetra_h.cpp include/rs232.c include/rs232.h include/rs232_common.c include/rs232_common.h src/drive_module.c src/drive_module.h src/dssp_rs232_drive_module.c src/dssp_rs232_drive_module.h)
 
 set(dependencies
   rclcpp
@@ -59,11 +60,21 @@ set(dependencies
   interfaces
 )
 
-ament_target_dependencies(${PROJECT_NAME}
-  ${dependencies}
-)
+ament_target_dependencies(tetra_m ${dependencies})
+ament_target_dependencies(tetra_h ${dependencies})
 
-target_link_libraries(${PROJECT_NAME}
+target_link_libraries(tetra_m
+                      ${rclcpp_LIBRARIES}
+                      ${rmw_implementation_LIBRARIES}
+                      ${std_msgs_LIBRARIES}
+                      ${std_srvs_LIBRARIES}
+                      ${sensor_msgs_LIBRARIES}
+                      ${tf2_LIBRARIES}
+                      ${tf2_ros_LIBRARIES}
+                      ${nav_msgs_LIBRARIES}
+                      ${geometry_msgs_LIBRARIES})
+
+target_link_libraries(tetra_h
                       ${rclcpp_LIBRARIES}
                       ${rmw_implementation_LIBRARIES}
                       ${std_msgs_LIBRARIES}
@@ -75,7 +86,7 @@ target_link_libraries(${PROJECT_NAME}
                       ${geometry_msgs_LIBRARIES})
                       
 install(TARGETS 
-	${PROJECT_NAME} 
+	tetra_m tetra_h
 	DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY

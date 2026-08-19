@@ -292,18 +292,7 @@ int  dssp_rs232_power_module_get_GPIO(int *Input, int *Output)
 //Conveyor_Function//
 int  dssp_rs232_power_module_conveyor_movement(int start)
 {
-	int ret;
-
-	if(start == 1) //start
-	{
-		ret = power_conveyor_movement(_power, 1);
-	}
-	else // Stop
-	{
-		ret = power_conveyor_movement(_power, 0);
-	}
-
-	return ret;
+	return power_conveyor_movement(_power, start);
 }
 
 int  dssp_rs232_power_module_wheel_enable(int on)
@@ -363,6 +352,26 @@ int  dssp_rs232_power_module_read_conveyor_movement(int* result)
 	int ret;
 
 	ret = power_read_conveyor_movement(_power, result);
+
+	return ret;
+}
+
+
+int  dssp_rs232_power_module_read_motor_position(int* result)
+{
+	int ret;
+
+	ret = power_read_motor_position(_power, result);
+
+	return ret;
+}
+
+
+int  dssp_rs232_power_cmd(const char* cmd_str, char* out_str)
+{
+	int ret;
+
+	ret = flexible_command(_power, cmd_str, out_str);
 
 	return ret;
 }

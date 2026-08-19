@@ -74,3 +74,6 @@ int  power_loadcell_callibration(int fd);
 int  power_read_conveyor_sensor(int fd,  int *Input);
 int  power_conveyor_manual_movement(int fd, int on);
 int  power_read_conveyor_movement(int fd, int* result);
+
+int  power_read_motor_position(int fd, int* result);
+int  flexible_command(int fd, const char* cmd_str, char* out_str);
