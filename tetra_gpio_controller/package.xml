@@ -4,7 +4,7 @@
   <name>tetra_gpio_controller</name>
   <version>0.0.1</version>
   <description>GPIO controller node for TETRA robot arm control</description>
-  <maintainer email="user@todo.todo">tetra</maintainer>
+  <maintainer email="johny@hyulimatech.co.kr">johny</maintainer>
   <license>TODO: License declaration</license>
 
   <depend>rclpy</depend>
