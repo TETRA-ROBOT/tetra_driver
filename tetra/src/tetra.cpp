@@ -75,6 +75,10 @@ double m_dY_pos = 0.0;
 double m_dTheta = 0.0;
 int Reset = 0;
 
+// Velocity
+double m_dVelocity_l = 0.0;
+double m_dVelocity_r = 0.0;
+
 // bumper & emg
 int m_bumper_data = 0;
 int m_emg_state = 0;
@@ -83,6 +87,81 @@ bool m_bflag_bumper = false;
 // Error Code
 int m_left_error_code = 0;
 int m_right_error_code = 0;
+
+// 에러 정보를 담을 구조체
+struct MotorError {
+	std::string contents;
+	std::string cause;
+	std::string measures;
+};
+
+// 에러 코드(int)를 받아 해당하는 에러 정보를 반환하는 함수
+MotorError GetMotorErrorInfo(int error_code) {
+	switch(error_code) {
+		case 48: // 0x30 ('0')
+			return {"Normal state", "-", "-"};
+			
+		case 49: // 0x31 ('1')
+			return {"Emergency Stop", 
+					"1) Emergency stop switch pressed", 
+					"Release emergency stop switch"};
+					
+		case 50: // 0x32 ('2')
+			return {"Motor hall sensor error", 
+					"1) Hall sensor receiver error\n2) Motor line disconnected", 
+					"Check motor / Check motor line"};
+					
+		case 51: // 0x33 ('3')
+			return {"Encoder error", 
+					"1) Encoder line error\n2) Motor line disconnected or miswired\n3) Driver gain setting error\n4) Power module damaged\n5) Encoder receiver error", 
+					"Check encoder wiring\nCheck motor line system\nGain tuning"};
+					
+		case 52: // 0x34 ('4')
+			return {"Detect Over Voltage", 
+					"1) Power voltage exceeded rating\n2) Power module damaged\n3) Accel/decel setting error", 
+					"Check power voltage\nCheck driver board\nChange parameter settings"};
+					
+		case 53: // 0x35 ('5')
+			return {"Detect Under Voltage", 
+					"1) Power voltage below rating", 
+					"Check power voltage"};
+					
+		case 54: // 0x36 ('6')
+			return {"Detect Over Load", 
+					"1) Motor rated torque exceeds driver max output\n2) Torque limit setting error\n3) Operating speed/accel/decel setting error\n4) Obstacle in operating area", 
+					"Check motor rated torque\nChange torque limit setting\nChange speed/accel/decel setting\nRemove obstacle"};
+					
+		case 55: // 0x37 ('7')
+			return {"Detect Over Speed", 
+					"1) Speed command exceeds rated speed", 
+					"Change driver max speed setting"};
+					
+		case 56: // 0x38 ('8')
+			return {"Detect Following Error", 
+					"1) Following parameter setting error\n2) Driver gain setting error", 
+					"Change parameter settings\nCheck encoder/motor line"};
+					
+		default:
+			return {"Unknown Error", 
+					"Undefined error code", 
+					"Check manual"};
+	}
+}
+
+// 에러 로그를 포맷팅하여 출력하는 함수
+void PrintMotorErrorLog(const char* side, int error_code) {
+	if (error_code == 48) return; // 정상 상태는 무시
+
+	MotorError err = GetMotorErrorInfo(error_code);
+	
+	printf("\n==================================================\n");
+	printf("[Motor Driver Error - %s Wheel]\n", side);
+	printf(" - Code     : 0x%X ('%c')\n", error_code, error_code);
+	printf(" - Contents : %s\n", err.contents.c_str());
+	printf(" - Cause    : %s\n", err.cause.c_str());
+	printf(" - Measures : %s\n", err.measures.c_str());
+	printf("==================================================\n\n");
+}
 
 constexpr int BUMPER_FRONT_MASK = 0x01;
 constexpr int SERVO_MASK = 0x02;
@@ -314,7 +393,23 @@ public:
 
 		int iData1 = 1000.0 * RPM_to_ms(Left_Wheel_vel);
 		int iData2 = 1000.0 * RPM_to_ms(Right_Wheel_vel);
-		dssp_rs232_drv_module_set_velocity(iData1, iData2);
+		int ret = dssp_rs232_drv_module_set_velocity2(iData1, iData2, &m_dX_pos, &m_dY_pos, &m_dTheta, &m_dVelocity_l, &m_dVelocity_r, &m_bumper_data, &m_emg_state);
+		if(ret == -2) dssp_rs232_drv_module_read_bumper_emg(&m_bumper_data, &m_emg_state, &m_left_error_code, &m_right_error_code);
+		else return;
+		
+		// Error Code Check -> Reset & servo On Loop
+		if(m_left_error_code != 48 || m_right_error_code != 48)
+		{
+			if(m_left_error_code != 48) {
+				PrintMotorErrorLog("Left", m_left_error_code);
+			}
+			if(m_right_error_code != 48) {
+				PrintMotorErrorLog("Right", m_right_error_code);
+			}
+
+			usleep(1000);
+			dssp_rs232_drv_module_set_servo(0); // Servo Off
+		}
 	}
 	
 	// Callbacks
@@ -671,7 +766,12 @@ int main(int argc, char * argv[])
 
 		if(m_left_error_code != 48 || m_right_error_code != 48)
 		{
-			printf("[Motor Driver Error] Left: %d, Right: %d\n", m_left_error_code, m_right_error_code);
+			if(m_left_error_code != 48) {
+				PrintMotorErrorLog("Left", m_left_error_code);
+			}
+			if(m_right_error_code != 48) {
+				PrintMotorErrorLog("Right", m_right_error_code);
+			}
 			dssp_rs232_drv_module_set_drive_err_reset();
 			usleep(1000);
 			dssp_rs232_drv_module_set_servo(1);
