@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(tetra_interface)
+project(tetra_wheel_driver)
 
 # Default to C99
 if(NOT CMAKE_C_STANDARD)
@@ -21,6 +21,10 @@ find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(interfaces REQUIRED)
 
@@ -32,16 +36,19 @@ include_directories(
   ${std_msgs_INCLUDE_DIRS}
   ${std_srvs_INCLUDE_DIRS}
   ${sensor_msgs_INCLUDE_DIRS}
+  ${tf2_INCLUDE_DIRS}
+  ${tf2_ros_INCLUDE_DIRS}
+  ${nav_msgs_INCLUDE_DIRS}
   ${geometry_msgs_INCLUDE_DIRS}
   ${interfaces_INCLUDE_DIRS}
 )
 
-add_executable(tetra_interface
+add_executable(tetra_wheel_driver
+  src/tetra_wheel_driver.cpp
   include/rs232.c
   include/rs232_common.c
-  src/power_module.c
-  src/dssp_rs232_power_module.c
-  src/tetra_interface.cpp
+  src/drive_module.c
+  src/dssp_rs232_drive_module.c
 )
 
 set(dependencies
@@ -49,14 +56,18 @@ set(dependencies
   std_msgs
   std_srvs
   sensor_msgs
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
   geometry_msgs
+  nav_msgs
   interfaces
 )
 
-ament_target_dependencies(tetra_interface ${dependencies})
+ament_target_dependencies(tetra_wheel_driver ${dependencies})
 
 install(TARGETS 
-  tetra_interface
+  tetra_wheel_driver
   DESTINATION lib/${PROJECT_NAME}
 )
 

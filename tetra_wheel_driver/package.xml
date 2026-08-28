@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>tetra</name>
+  <name>tetra_wheel_driver</name>
   <version>1.0.0</version>
-  <description>TETRA motor driver ROS2 package</description>
+  <description>TETRA wheel motor driver ROS2 package</description>
   <maintainer email="johny@hyulimatech.co.kr">johny</maintainer>
   <license>Apache License 2.0</license>
 

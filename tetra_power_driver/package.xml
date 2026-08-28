@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>tetra_interface</name>
+  <name>tetra_power_driver</name>
   <version>1.0.0</version>
-  <description>tetra_interface ROS2 package</description>
+  <description>tetra_power_driver ROS2 package</description>
   <maintainer email="johny@hyulimatech.co.kr">johny</maintainer>
   <license>Apache License 2.0</license>
 

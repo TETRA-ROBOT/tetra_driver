@@ -226,10 +226,10 @@ void signal_handler(int signal)
     printf("Signal received: %d. Preparing to shutdown...\n", signal);
 }
 
-class TETRA: public rclcpp::Node
+class TETRAWheelDriver: public rclcpp::Node
 {
 public:
-	TETRA() : Node("tetra")
+	TETRAWheelDriver() : Node("tetra_wheel_driver")
 	{
 		// Declare parameters
 		this->declare_parameter("robot_model", "m");
@@ -291,7 +291,7 @@ public:
 		if(custom_wheel_distance > 0.0) m_dWheel_Distance = custom_wheel_distance;
 		if(custom_tread_width > 0.0) m_dTread_Width = custom_tread_width;
 
-		RCLCPP_INFO(this->get_logger(), "TETRA Driver Initialized (Model: %s, Wheel Radius: %.4fm, Wheel Dist: %.4fm, EKF: %d)",
+		RCLCPP_INFO(this->get_logger(), "TETRA Wheel Driver Initialized (Model: %s, Wheel Radius: %.4fm, Wheel Dist: %.4fm, EKF: %d)",
 			robot_model.c_str(), m_dWheel_Radius, m_dWheel_Distance, m_bEKF_option);
 
 		// tf2_ros
@@ -305,39 +305,39 @@ public:
 		right_error_code_publisher = this->create_publisher<std_msgs::msg::Int32>("right_error_code", 1);
 
 		// subscribe list
-		joy_subscriber = this->create_subscription<sensor_msgs::msg::Joy>("joy", rclcpp::SensorDataQoS(), std::bind(&TETRA::joyCallback, this, _1));
-		cmd_vel_subscriber = this->create_subscription<geometry_msgs::msg::Twist>("cmd_vel_nav", rclcpp::SensorDataQoS(), std::bind(&TETRA::velCallback, this, _1));
-		cmd_vel_subscriber2 = this->create_subscription<geometry_msgs::msg::Twist>("cmd_vel_nav2", rclcpp::SensorDataQoS(), std::bind(&TETRA::velCallback2, this, _1));
-		cmd_vel_manual_subscriber = this->create_subscription<geometry_msgs::msg::Twist>("cmd_vel_manual", rclcpp::SensorDataQoS(), std::bind(&TETRA::Manual_velCallback, this, _1));
-		acc_subscriber = this->create_subscription<std_msgs::msg::Int32>("accel_vel", 10, std::bind(&TETRA::accelCallback, this, _1));
-		pose_reset_subscriber = this->create_subscription<std_msgs::msg::Int32>("pose_reset", 10, std::bind(&TETRA::pose_resetCallback, this, _1));
-		servo_on_subscriber = this->create_subscription<std_msgs::msg::Int32>("servo_on", 10, std::bind(&TETRA::servo_onCallback, this, _1));
-		power_status_subscriber = this->create_subscription<std_msgs::msg::Int32>("power_status", 10, std::bind(&TETRA::power_statusCallback, this, _1));
+		joy_subscriber = this->create_subscription<sensor_msgs::msg::Joy>("joy", rclcpp::SensorDataQoS(), std::bind(&TETRAWheelDriver::joyCallback, this, _1));
+		cmd_vel_subscriber = this->create_subscription<geometry_msgs::msg::Twist>("cmd_vel_nav", rclcpp::SensorDataQoS(), std::bind(&TETRAWheelDriver::velCallback, this, _1));
+		cmd_vel_subscriber2 = this->create_subscription<geometry_msgs::msg::Twist>("cmd_vel_nav2", rclcpp::SensorDataQoS(), std::bind(&TETRAWheelDriver::velCallback2, this, _1));
+		cmd_vel_manual_subscriber = this->create_subscription<geometry_msgs::msg::Twist>("cmd_vel_manual", rclcpp::SensorDataQoS(), std::bind(&TETRAWheelDriver::Manual_velCallback, this, _1));
+		acc_subscriber = this->create_subscription<std_msgs::msg::Int32>("accel_vel", 10, std::bind(&TETRAWheelDriver::accelCallback, this, _1));
+		pose_reset_subscriber = this->create_subscription<std_msgs::msg::Int32>("pose_reset", 10, std::bind(&TETRAWheelDriver::pose_resetCallback, this, _1));
+		servo_on_subscriber = this->create_subscription<std_msgs::msg::Int32>("servo_on", 10, std::bind(&TETRAWheelDriver::servo_onCallback, this, _1));
+		power_status_subscriber = this->create_subscription<std_msgs::msg::Int32>("power_status", 10, std::bind(&TETRAWheelDriver::power_statusCallback, this, _1));
 
 		// service list
 		parameter_read_srv = create_service<interfaces::srv::ParameterRead>(
         	"param_read_cmd", 
-			std::bind(&TETRA::Parameter_Read_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAWheelDriver::Parameter_Read_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		parameter_write_srv = create_service<interfaces::srv::ParameterWrite>(
         	"param_write_cmd", 
-			std::bind(&TETRA::Parameter_Write_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAWheelDriver::Parameter_Write_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		set_move_mode_srv = create_service<interfaces::srv::SetMoveMode>(
         	"mode_change_cmd", 
-			std::bind(&TETRA::Movemode_Change_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAWheelDriver::Movemode_Change_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		linear_position_move_srv = create_service<interfaces::srv::LinearPositionMove>(
         	"linear_move_cmd", 
-			std::bind(&TETRA::Linear_Move_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAWheelDriver::Linear_Move_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		angular_position_move_srv = create_service<interfaces::srv::AngularPositionMove>(
         	"angular_move_cmd", 
-			std::bind(&TETRA::Angular_Move_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAWheelDriver::Angular_Move_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		servo_srv = create_service<interfaces::srv::Servo>(
         	"servo_cmd", 
-			std::bind(&TETRA::Servo_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAWheelDriver::Servo_Command, this, std::placeholders::_1, std::placeholders::_2));
 	}
 
 	rclcpp::Time current_time, last_time;
@@ -665,7 +665,7 @@ int main(int argc, char * argv[])
 	rclcpp::init(argc, argv);
 	std::signal(SIGINT, signal_handler);
 	setvbuf(stdout, NULL, _IONBF, BUFSIZ);
-	auto node = std::make_shared<TETRA>();
+	auto node = std::make_shared<TETRAWheelDriver>();
 
 	if(port[0] == '\0')
 	{
@@ -688,7 +688,7 @@ int main(int argc, char * argv[])
 	rclcpp::WallRate loop_rate(30);
 
 	printf("======================================\n");
-	printf(" TETRA Motor Driver Node Started (%s)\n", port);
+	printf(" TETRA Wheel Driver Node Started (%s)\n", port);
 	printf("======================================\n");
 
 	while (rclcpp::ok() && !stop_requested)

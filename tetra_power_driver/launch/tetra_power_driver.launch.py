@@ -4,9 +4,9 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 
 def generate_launch_description():
-    tetra_interface_node = Node(
-        package='tetra_interface', 
-        executable='tetra_interface',
+    tetra_power_driver_node = Node(
+        package='tetra_power_driver', 
+        executable='tetra_power_driver',
         output='screen',
         parameters=[
             {"m_bConveyor_option": False},
@@ -15,5 +15,5 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        tetra_interface_node
+        tetra_power_driver_node
     ])

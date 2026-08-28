@@ -12,9 +12,9 @@ def generate_launch_description():
         description='TETRA robot model (m, h, edu, mh, s, sm)'
     )
 
-    tetra_node = Node(
-        package='tetra', 
-        executable='tetra',
+    tetra_wheel_driver_node = Node(
+        package='tetra_wheel_driver', 
+        executable='tetra_wheel_driver',
         output='screen',
         parameters=[
             {"robot_model": LaunchConfiguration('robot_model')},
@@ -24,5 +24,5 @@ def generate_launch_description():
 
     return LaunchDescription([
         robot_model_arg,
-        tetra_node
+        tetra_wheel_driver_node
     ])

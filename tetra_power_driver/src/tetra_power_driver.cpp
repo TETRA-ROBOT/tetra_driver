@@ -166,10 +166,10 @@ void Error_Log_write(string log_data)
 	}
 }
 
-class TETRA_INTERFACE: public rclcpp::Node
+class TETRAPowerDriver: public rclcpp::Node
 {
 public:
-	TETRA_INTERFACE() : Node("tetra_interface")
+	TETRAPowerDriver() : Node("tetra_power_driver")
 	{
 		// Declare and get parameters
 		this->declare_parameter("port", "/dev/ttyS1");
@@ -209,91 +209,91 @@ public:
 		// Services
 		led_control_srv = create_service<interfaces::srv::LedControl>(
         	"led_cmd", 
-			std::bind(&TETRA_INTERFACE::LED_Control_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAPowerDriver::LED_Control_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		led_toggle_control_srv = create_service<interfaces::srv::LedToggleControl>(
         	"led_toggle_cmd", 
-			std::bind(&TETRA_INTERFACE::LED_Toggle_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAPowerDriver::LED_Toggle_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		toggle_on_srv = create_service<interfaces::srv::ToggleOn>(
         	"turn_on_cmd", 
-			std::bind(&TETRA_INTERFACE::Toggle_On_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAPowerDriver::Toggle_On_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		integrallog_srv = create_service<interfaces::srv::Integrallog>(
         	"log_cmd", 
-			std::bind(&TETRA_INTERFACE::Integrallog_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAPowerDriver::Integrallog_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		power_set_outport_srv = create_service<interfaces::srv::PowerSetOutport>(
         	"Power_outport_cmd", 
-			std::bind(&TETRA_INTERFACE::Power_Set_Outport_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAPowerDriver::Power_Set_Outport_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		power_set_single_outport_srv = create_service<interfaces::srv::PowerSetSingleOutport>(
         	"Power_single_outport_cmd", 
-			std::bind(&TETRA_INTERFACE::Power_Set_Single_Outport_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAPowerDriver::Power_Set_Single_Outport_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		power_get_io_status_srv = create_service<interfaces::srv::PowerGetIoStatus>(
         	"Power_io_status_cmd", 
-			std::bind(&TETRA_INTERFACE::Power_Get_IO_Status_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAPowerDriver::Power_Get_IO_Status_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		power_set_enable_srv = create_service<interfaces::srv::PowerSetEnable>(
         	"Power_enable_cmd", 
-			std::bind(&TETRA_INTERFACE::Power_Set_Enable_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAPowerDriver::Power_Set_Enable_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		power_set_single_enable_srv = create_service<interfaces::srv::PowerSetSingleEnable>(
         	"Power_single_enable_cmd", 
-			std::bind(&TETRA_INTERFACE::Power_Set_Single_Enable_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAPowerDriver::Power_Set_Single_Enable_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		power_wheel_enable_srv = create_service<interfaces::srv::PowerWheelEnable>(
         	"Power_wheel_enable_cmd", 
-			std::bind(&TETRA_INTERFACE::Power_Wheel_Enable_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAPowerDriver::Power_Wheel_Enable_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		power_parameter_read_srv = create_service<interfaces::srv::PowerParameterRead>(
         	"Power_parameter_read_cmd", 
-			std::bind(&TETRA_INTERFACE::Power_Paramter_Read_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAPowerDriver::Power_Paramter_Read_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		power_parameter_write_srv = create_service<interfaces::srv::PowerParameterWrite>(
         	"Power_parameter_write_cmd", 
-			std::bind(&TETRA_INTERFACE::Power_Paramter_Write_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAPowerDriver::Power_Paramter_Write_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		power_data_read_srv = create_service<interfaces::srv::PowerDataRead>(
         	"Power_data_read_cmd", 
-			std::bind(&TETRA_INTERFACE::Power_Data_Read_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAPowerDriver::Power_Data_Read_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		power_adc_read_srv = create_service<interfaces::srv::PowerAdcRead>(
         	"Power_adc_read_cmd", 
-			std::bind(&TETRA_INTERFACE::Power_ADC_Read_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAPowerDriver::Power_ADC_Read_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		power_version_read_srv = create_service<interfaces::srv::PowerVersionRead>(
         	"Power_version_read_cmd", 
-			std::bind(&TETRA_INTERFACE::Power_Version_Read_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAPowerDriver::Power_Version_Read_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		conveyor_auto_movement_srv = create_service<interfaces::srv::ConveyorAutoMovement>(
         	"Conveyor_auto_move_cmd", 
-			std::bind(&TETRA_INTERFACE::Conveyor_Auto_Movement_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAPowerDriver::Conveyor_Auto_Movement_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		conveyor_manual_movement_srv = create_service<interfaces::srv::ConveyorManualMovement>(
         	"Conveyor_manual_move_cmd", 
-			std::bind(&TETRA_INTERFACE::Conveyor_Manual_Movement_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAPowerDriver::Conveyor_Manual_Movement_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		conveyor_parameter_read_srv = create_service<interfaces::srv::ConveyorParameterRead>(
         	"Conveyor_parameter_read_cmd", 
-			std::bind(&TETRA_INTERFACE::Conveyor_Parameter_Read_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAPowerDriver::Conveyor_Parameter_Read_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		conveyor_parameter_write_srv = create_service<interfaces::srv::ConveyorParameterWrite>(
         	"Conveyor_parameter_write_cmd", 
-			std::bind(&TETRA_INTERFACE::Conveyor_Parameter_Write_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAPowerDriver::Conveyor_Parameter_Write_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		conveyor_data_read_srv = create_service<interfaces::srv::ConveyorDataRead>(
         	"Conveyor_data_read_cmd", 
-			std::bind(&TETRA_INTERFACE::Conveyor_Data_Read_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAPowerDriver::Conveyor_Data_Read_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		power_sonar_read_srv = create_service<interfaces::srv::PowerSonarRead>(
         	"Power_sonar_read_cmd", 
-			std::bind(&TETRA_INTERFACE::Power_Sonar_Read_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAPowerDriver::Power_Sonar_Read_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		power_sonar_cmd_srv = create_service<interfaces::srv::PowerSonarCmd>(
         	"Power_sonar_start_cmd", 
-			std::bind(&TETRA_INTERFACE::Power_Sonar_Command, this, std::placeholders::_1, std::placeholders::_2));
+			std::bind(&TETRAPowerDriver::Power_Sonar_Command, this, std::placeholders::_1, std::placeholders::_2));
 	}
 
 	rclcpp::Time current_time, last_time;
@@ -782,7 +782,7 @@ int main(int argc, char * argv[])
 	rclcpp::init(argc, argv);
 	std::signal(SIGINT, signal_handler);
 	setvbuf(stdout, NULL, _IONBF, BUFSIZ);
-	auto node = std::make_shared<TETRA_INTERFACE>();
+	auto node = std::make_shared<TETRAPowerDriver>();
 
 	rclcpp::WallRate loop_rate(30);
 
@@ -809,7 +809,7 @@ int main(int argc, char * argv[])
 	if(m_bUltrasonic_option) dssp_rs232_power_module_set_Ultrasonic(1);
 
 	printf("=========================================\n");
-	printf(" TETRA Interface Node Started (Port: %s)\n", port);
+	printf(" TETRA Power Driver Node Started (Port: %s)\n", port);
 	printf("=========================================\n");
 
 	while (rclcpp::ok() && !stop_requested)
