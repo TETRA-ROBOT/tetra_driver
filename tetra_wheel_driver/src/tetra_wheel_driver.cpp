@@ -2,6 +2,7 @@
 #include "nav_msgs/msg/odometry.hpp"
 #include "std_msgs/msg/float64.hpp"
 #include "std_msgs/msg/int32.hpp"
+#include "std_msgs/msg/bool.hpp"
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/pose2_d.hpp"
@@ -303,6 +304,9 @@ public:
 		emg_publisher = this->create_publisher<std_msgs::msg::Int32>("emg_state", 1);
 		left_error_code_publisher = this->create_publisher<std_msgs::msg::Int32>("left_error_code", 1);
 		right_error_code_publisher = this->create_publisher<std_msgs::msg::Int32>("right_error_code", 1);
+		// 상태 변화 시에만 발행하므로 transient_local 로 래치해서 늦게 붙는 관제 서버도 현재 상태를 받게 한다.
+		drive_board_incompatible_publisher = this->create_publisher<std_msgs::msg::Bool>(
+			"drive_board_incompatible", rclcpp::QoS(1).transient_local().reliable());
 
 		// subscribe list
 		joy_subscriber = this->create_subscription<sensor_msgs::msg::Joy>("joy", rclcpp::SensorDataQoS(), std::bind(&TETRAWheelDriver::joyCallback, this, _1));
@@ -349,6 +353,46 @@ public:
 	rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr emg_publisher;
 	rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr left_error_code_publisher;
 	rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr right_error_code_publisher;
+	rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr drive_board_incompatible_publisher;
+
+	// 일시적인 노이즈로 오탐하지 않도록 구형 ACK 가 연속으로 들어올 때만 비호환으로 판정한다.
+	static constexpr int kLegacyAckThreshold = 20;
+	int legacy_ack_streak_ = 0;
+	bool drive_board_incompatible_ = false;
+	bool drive_board_state_published_ = false;
+
+	void PublishDriveBoardIncompatible(bool incompatible)
+	{
+		if(drive_board_state_published_ && drive_board_incompatible_ == incompatible) return;
+		drive_board_incompatible_ = incompatible;
+		drive_board_state_published_ = true;
+
+		std_msgs::msg::Bool msg;
+		msg.data = incompatible;
+		drive_board_incompatible_publisher->publish(msg);
+		if(incompatible) {
+			RCLCPP_ERROR(this->get_logger(),
+				"구동보드 펌웨어가 구버전입니다 (velocity2 미지원, 응답 02 32 03). 구동보드를 업데이트하세요.");
+		} else {
+			RCLCPP_INFO(this->get_logger(), "구동보드 velocity2 응답 정상");
+		}
+	}
+
+	void UpdateDriveBoardCompatibility()
+	{
+		switch(drvm_get_velocity2_response()) {
+			case DRVM_RESP_OK:
+				legacy_ack_streak_ = 0;
+				PublishDriveBoardIncompatible(false);
+				break;
+			case DRVM_RESP_LEGACY_ACK:
+				if(++legacy_ack_streak_ >= kLegacyAckThreshold) PublishDriveBoardIncompatible(true);
+				break;
+			default:
+				// 무응답(보드 분리 등)은 보드 버전과 무관하므로 판정을 바꾸지 않는다.
+				break;
+		}
+	}
 
 	// Subscriptions
 	rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_subscriber;
@@ -394,6 +438,7 @@ public:
 		int iData1 = 1000.0 * RPM_to_ms(Left_Wheel_vel);
 		int iData2 = 1000.0 * RPM_to_ms(Right_Wheel_vel);
 		int ret = dssp_rs232_drv_module_set_velocity2(iData1, iData2, &m_dX_pos, &m_dY_pos, &m_dTheta, &m_dVelocity_l, &m_dVelocity_r, &m_bumper_data, &m_emg_state);
+		UpdateDriveBoardCompatibility();
 		if(ret == -2) dssp_rs232_drv_module_read_bumper_emg(&m_bumper_data, &m_emg_state, &m_left_error_code, &m_right_error_code);
 		else return;
 		

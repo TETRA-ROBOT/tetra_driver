@@ -507,6 +507,18 @@ int drvm_set_Charge_Off(int fd)
 	return ret;
 }
 
+static int s_velocity2_response = DRVM_RESP_INVALID;
+
+int drvm_get_velocity2_response(void)
+{
+	return s_velocity2_response;
+}
+
+static int is_legacy_velocity2_ack(const unsigned char *packet_buf)
+{
+	return packet_buf[0] == 0x02 && packet_buf[1] == 0x32 && packet_buf[2] == 0x03;
+}
+
 int drvm_set_velocity2(int fd, int left, int right, double *x, double *y, double *theta, double *velocity_l, double *velocity_r, int *bumper, int *emg)
 {
 	int ret;
@@ -528,6 +540,7 @@ int drvm_set_velocity2(int fd, int left, int right, double *x, double *y, double
 	Right_data[0] = sign2 | ((mag2 >> 8) & 0x7F);
 	Right_data[1] = mag2 & 0xFF;
 
+	s_velocity2_response = DRVM_RESP_INVALID;
 	if(fd < 0) return -1;
 
 	packet_buf[3] = Left_data[0];
@@ -546,6 +559,7 @@ int drvm_set_velocity2(int fd, int left, int right, double *x, double *y, double
 	ret = get_response2(fd, packet_buf);
 	if(packet_buf[0] == 0x02 && (packet_buf[1] == 0x30 || packet_buf[1] == 0x32) && packet_buf[18] == 0x03)
 	{
+		s_velocity2_response = DRVM_RESP_OK;
 		m_check_X = (packet_buf[2] >> 7);
 		buf_x = (packet_buf[5] & 0xff) | ((packet_buf[4] << 8) & 0xff00) | ((packet_buf[3] << 16) & 0xff0000) | ((packet_buf[2] << 24) & 0x7f000000);
 		if(m_check_X == 0)
@@ -604,6 +618,12 @@ int drvm_set_velocity2(int fd, int left, int right, double *x, double *y, double
 		// 	packet_buf[9], packet_buf[10], packet_buf[11], packet_buf[12], packet_buf[13], packet_buf[14], packet_buf[15], packet_buf[16], 
 		// 	packet_buf[17], packet_buf[18], packet_buf[19]);
 
+	}
+	else if(is_legacy_velocity2_ack(packet_buf))
+	{
+		// 구형 보드는 매 주기마다 이 응답을 주므로 여기서 printf 하면 로그가 넘친다. 경고는 노드에서 throttle 처리.
+		s_velocity2_response = DRVM_RESP_LEGACY_ACK;
+		return -2;
 	}
 	else
 	{

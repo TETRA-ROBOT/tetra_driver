@@ -25,3 +25,10 @@ int drvm_read_odometry(int fd, double *Xpos_mm, double *Ypos_mm, double *deg);
 int drvm_set_Charge_On(int fd);
 int drvm_set_Charge_Off(int fd);
 int drvm_set_velocity2(int fd, int left, int right, double *x, double *y, double *theta, double *velocity_l, double *velocity_r, int *bumper, int *emg);
+
+/* drvm_set_velocity2() 의 마지막 응답 분류.
+ * 반환값(ret)은 정상 응답에서도 음수일 수 있어 보드 호환성 판별에 쓸 수 없으므로 별도로 노출한다. */
+#define DRVM_RESP_OK          0  /* 신형 보드: odometry 포함 20바이트 응답 */
+#define DRVM_RESP_LEGACY_ACK  1  /* 구형 보드: velocity2 미지원, 02 32 03 LRC 짧은 ACK 만 회신 */
+#define DRVM_RESP_INVALID     2  /* 무응답(보드 미연결) 또는 깨진 패킷 */
+int drvm_get_velocity2_response(void);
