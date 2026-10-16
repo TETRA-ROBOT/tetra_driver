@@ -153,37 +153,30 @@ int get_response(int fd, unsigned char data[])
 
 int get_response2(int fd, unsigned char data[])
 {
-	int index;
-	int ret = 0;
+	int ret;
+	int read_bytes = 0;
 
 	do
 	{
 		ret = read(fd, data, 1);
-		if(ret <= 0) 
+		if(ret <= 0)
 			return -1;
 
 	} while(!(data[0] == STX));
 
-	index = 1;
-	
-	do
+	// velocity2 응답은 STX 포함 20바이트 고정 길이다. ETX 위치로 끝을 찾으면 매 주기 read 타임아웃(200ms)까지 기다리게 된다.
+	while(read_bytes < 19)
 	{
-		ret = read(fd, &data[index], 1);
-		index++;
-		if(ret <= 0) 
+		ret = read(fd, &data[1 + read_bytes], 19 - read_bytes);
+		if(ret <= 0)
 			return -1;
+		read_bytes += ret;
+	}
 
-	} while((data[14] != ETX));
-
-	
 	if(data[1] != FLAG_OK)
 		return -1;
-	else if(data[index-1] != make_lrc(&data[1], index - 2)) 
-	{
+	if(data[19] != make_lrc(&data[1], 18))
 		return -1;
-	}
-	else 
-	{
-		return 0;
-	}
+
+	return 0;
 }

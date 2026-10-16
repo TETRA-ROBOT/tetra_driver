@@ -727,9 +727,17 @@ int main(int argc, char * argv[])
 		return -1;
 	}
 
-	// Servo On
-	dssp_rs232_drv_module_set_servo(1);
+	// 펌웨어를 새로 올린 보드는 속도 모드가 아닌 상태로 부팅해 velocity2 를 FLAG_FAIL(02 32 03)로 거부하므로 서보 ON 전에 모드를 명시한다
+	dssp_rs232_drv_module_set_drive_err_reset();
+	usleep(10000);
 	dssp_rs232_drv_module_set_parameter(6, m_old_accel_data);
+	usleep(10000);
+	dssp_rs232_drv_module_set_velocitymode();
+	usleep(10000);
+	dssp_rs232_drv_module_set_servo(1);
+	usleep(10000);
+	dssp_rs232_drv_module_reset_odometry();
+	usleep(10000);
 	rclcpp::WallRate loop_rate(30);
 
 	printf("======================================\n");
