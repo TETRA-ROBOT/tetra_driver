@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <termios.h>
 #include "drive_module.h"
 #include "rs232_common.h"
 
@@ -508,6 +509,38 @@ int drvm_set_Charge_Off(int fd)
 }
 
 static int s_velocity2_response = DRVM_RESP_INVALID;
+
+/* 버전 응답은 다른 명령과 달리 FLAG 없이 STX + ASCII + ETX + LRC 로 오므로 ETX 까지 읽고 LRC 를 직접 검증한다 */
+int drvm_read_version(int fd, char *version)
+{
+	unsigned char packet_buf[32] = {STX, 'V', 'R', ETX};
+	unsigned char received = 0;
+	unsigned char lrc = 0;
+	int length = 0;
+
+	if(fd < 0) return -1;
+	packet_buf[4] = make_lrc(&packet_buf[1], 3);
+	tcflush(fd, TCIFLUSH);
+	if(write(fd, packet_buf, 5) <= 0) return -2;
+
+	do {
+		if(read(fd, &received, 1) <= 0) return -3;
+	} while(received != STX);
+
+	memset(packet_buf, 0, sizeof(packet_buf));
+	while(length < (int)sizeof(packet_buf) - 1) {
+		if(read(fd, &packet_buf[length], 1) <= 0) return -3;
+		if(packet_buf[length] == ETX) break;
+		length++;
+	}
+	if(read(fd, &lrc, 1) <= 0) return -3;
+	if(lrc != make_lrc(packet_buf, length + 1)) return -4;
+	if(length != DRVM_VERSION_LENGTH) return -5;
+
+	memcpy(version, packet_buf, DRVM_VERSION_LENGTH);
+	version[DRVM_VERSION_LENGTH] = '\0';
+	return 0;
+}
 
 int drvm_get_velocity2_response(void)
 {

@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
+#include <unistd.h>
+#include <termios.h>
 #include "power_module.h"
 #include "rs232_common.h"
 
@@ -512,40 +514,39 @@ int  power_adc_read(int fd, int *iADB_0, int *iADB_1, int *iADB_2, int *iADB_3,
 	return ret;
 }
 
+/* 버전 응답은 길이 필드 없이 STX + ASCII 8글자(보드 종류, 연도 2, 월 2, 일 2, 버전) + ETX + LRC 로 온다 (예: "22512300").
+ * 예전에는 get_response2 가 앞 두 글자를 길이로 해석해 "512300" 만 남았다. 각 글자를 숫자 한 자리씩 돌려준다. */
 int  power_version_read(int fd, int *idata_0, int *idata_1, int *idata_2, int *idata_3,int *idata_4, int *idata_5, int *idata_6, int *idata_7) 
 {
-	unsigned char packet_buf[255] = {STX, 'V','R', ETX};
-	int ret;
+	unsigned char packet_buf[32] = {STX, 'V','R', ETX};
+	unsigned char received = 0;
+	unsigned char lrc = 0;
+	int length = 0;
+	int *digits[8] = {idata_0, idata_1, idata_2, idata_3, idata_4, idata_5, idata_6, idata_7};
+
 	if(!fd) return -1;
 	packet_buf[4] = make_lrc(&packet_buf[1], 3);
-	ret = write(fd, packet_buf, 5);
-	if(ret <= 0) return -2;
+	tcflush(fd, TCIFLUSH);
+	if(write(fd, packet_buf, 5) <= 0) return -2;
 
-	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response2(fd, packet_buf);
-	if(packet_buf[1] == 0x02) //Packet Error Pass..
-	{
-		return -1;
+	do {
+		if(read(fd, &received, 1) <= 0) return -3;
+	} while(received != STX);
+
+	memset(packet_buf, 0, sizeof(packet_buf));
+	while(length < (int)sizeof(packet_buf) - 1) {
+		if(read(fd, &packet_buf[length], 1) <= 0) return -3;
+		if(packet_buf[length] == ETX) break;
+		length++;
 	}
+	if(read(fd, &lrc, 1) <= 0) return -3;
+	if(lrc != make_lrc(packet_buf, length + 1)) return -4;
+	if(length != 8) return -5;
 
-	int m_data0 = (packet_buf[4] & 0xff) | ((packet_buf[3] << 8) & 0xff00);
-	*idata_0 = m_data0;
-	int m_data1 = (packet_buf[6] & 0xff) | ((packet_buf[5] << 8) & 0xff00);
-	*idata_1 = m_data1;
-	int m_data2 = (packet_buf[8] & 0xff) | ((packet_buf[7] << 8) & 0xff00);
-	*idata_2 = m_data2;
-	int m_data3 = (packet_buf[10] & 0xff) | ((packet_buf[9] << 8) & 0xff00);
-	*idata_3 = m_data3;
-	int m_data4 = (packet_buf[12] & 0xff) | ((packet_buf[11] << 8) & 0xff00);
-	*idata_4 = m_data4;
-	int m_data5 = (packet_buf[14] & 0xff) | ((packet_buf[13] << 8) & 0xff00);
-	*idata_5 = m_data5;
-	int m_data6 = (packet_buf[16] & 0xff) | ((packet_buf[15] << 8) & 0xff00);
-	*idata_6 = m_data6;
-	int m_data7 = (packet_buf[18] & 0xff) | ((packet_buf[17] << 8) & 0xff00);
-	*idata_7 = m_data7;
-	
-	return ret;
+	for(int i = 0; i < 8; i++) {
+		*digits[i] = packet_buf[i] - '0';
+	}
+	return 0;
 }
 
 int  power_sonar_read(int fd, int *idata_0, int *idata_1, int *idata_2, int *idata_3,int *idata_4, int *idata_5) 
