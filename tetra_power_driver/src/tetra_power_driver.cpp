@@ -617,8 +617,7 @@ public:
 	bool Power_Version_Read_Command(const std::shared_ptr<interfaces::srv::PowerVersionRead::Request> request, const std::shared_ptr<interfaces::srv::PowerVersionRead::Response> response)
 	{
 		(void)request;
-		bool bResult = false;
-		dssp_rs232_power_module_version_read(
+		int iResult = dssp_rs232_power_module_version_read(
 			&m_iParam0,&m_iParam1,&m_iParam2,&m_iParam3,&m_iParam4,&m_iParam5,&m_iParam6,&m_iParam7);
 
 		response->d0_board_type = m_iParam0;
@@ -630,8 +629,7 @@ public:
 		response->d6_day1 = m_iParam6;
 		response->d7_ver = m_iParam7;
 
-		bResult = true;
-		response->command_result = bResult;
+		response->command_result = (iResult == 0);
 		return true;
 	}
 
@@ -656,8 +654,8 @@ public:
 	bool Conveyor_Parameter_Read_Command(const std::shared_ptr<interfaces::srv::ConveyorParameterRead::Request> request, const std::shared_ptr<interfaces::srv::ConveyorParameterRead::Response> response)
 	{
 		(void)request;
-		bool bResult = false;
-		dssp_rs232_conveyor_module_parameter_read(
+		// 응답이 없거나 패킷 에러면 컨베이어/리프트 보드가 없는 것이다. API 는 이 결과로 미장착 여부를 판단한다
+		int iResult = dssp_rs232_conveyor_module_parameter_read(
 			&m_iParam0,&m_iParam1,&m_iParam2,&m_iParam3,&m_iParam4,&m_iParam5,&m_iParam6,&m_iParam7,&m_iParam8,&m_iParam9,&m_iParam10,
 			&m_iParam11,&m_iParam12,&m_iParam13,&m_iParam14,&m_iParam15,&m_iParam16,&m_iParam17,&m_iParam18,&m_iParam19,&m_iParam20);
 		
@@ -683,8 +681,7 @@ public:
 		response->p19_termianl_loading_base = m_iParam19;
 		response->p20_termianl_unloading_base = m_iParam20;
 	
-		bResult = true;
-		response->command_result = bResult;
+		response->command_result = (iResult == 0);
 		return true;
 	}
 
