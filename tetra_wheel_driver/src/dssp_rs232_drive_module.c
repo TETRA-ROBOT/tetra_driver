@@ -112,6 +112,11 @@ int  dssp_rs232_drv_module_set_parameter(int param, int value)
 	return ret;
 }
 
+int  dssp_rs232_drv_module_read_version(char *version)
+{
+	return drvm_read_version(_drv, version);
+}
+
 int  dssp_rs232_drv_module_read_parameter(int param, int *value)
 {
 	int ret;

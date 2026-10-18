@@ -18,6 +18,8 @@
 #include "interfaces/srv/linear_position_move.hpp"
 #include "interfaces/srv/angular_position_move.hpp"
 #include "interfaces/srv/servo.hpp"
+// 버전 응답 필드(보드 종류·날짜·버전)가 같아 전원 보드용 타입을 함께 쓴다
+#include "interfaces/srv/power_version_read.hpp"
 
 #ifdef __cplusplus
 extern "C"
@@ -239,12 +241,14 @@ public:
 		this->declare_parameter("wheel_radius", 0.0);
 		this->declare_parameter("wheel_distance", 0.0);
 		this->declare_parameter("tread_width", 0.0);
+		this->declare_parameter("cmd_vel_timeout", 0.5);
 
 		// Get parameters
 		std::string robot_model = this->get_parameter("robot_model").as_string();
 		std::string port_str = this->get_parameter("port").as_string();
 		strncpy(port, port_str.c_str(), sizeof(port) - 1);
 		m_bEKF_option = this->get_parameter("m_bEKF_option").as_bool();
+		m_dCmdVelTimeout = this->get_parameter("cmd_vel_timeout").as_double();
 
 		// Configure physical parameters based on robot_model
 		if(robot_model == "h" || robot_model == "H")
@@ -319,6 +323,10 @@ public:
 		power_status_subscriber = this->create_subscription<std_msgs::msg::Int32>("power_status", 10, std::bind(&TETRAWheelDriver::power_statusCallback, this, _1));
 
 		// service list
+		drive_version_read_srv = create_service<interfaces::srv::PowerVersionRead>(
+			"drive_version_read_cmd",
+			std::bind(&TETRAWheelDriver::Drive_Version_Read_Command, this, std::placeholders::_1, std::placeholders::_2));
+
 		parameter_read_srv = create_service<interfaces::srv::ParameterRead>(
         	"param_read_cmd", 
 			std::bind(&TETRAWheelDriver::Parameter_Read_Command, this, std::placeholders::_1, std::placeholders::_2));
@@ -355,6 +363,29 @@ public:
 	rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr right_error_code_publisher;
 	rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr drive_board_incompatible_publisher;
 
+	// 웹 관제 연결이 끊기거나 내비게이션이 죽어도 마지막 속도 명령으로 계속 주행하지 않도록,
+	// cmd_vel_timeout 초 동안 새 명령이 없으면 정지한다 (0 이하면 비활성).
+	double m_dCmdVelTimeout = 0.5;
+	std::chrono::steady_clock::time_point m_lastVelocityCommandTime = std::chrono::steady_clock::now();
+
+	void MarkVelocityCommand()
+	{
+		m_lastVelocityCommandTime = std::chrono::steady_clock::now();
+	}
+
+	void StopIfVelocityCommandStale()
+	{
+		if(m_dCmdVelTimeout <= 0.0 || (linear == 0.0 && angular == 0.0)) return;
+		std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - m_lastVelocityCommandTime;
+		if(elapsed.count() < m_dCmdVelTimeout) return;
+
+		std::lock_guard<std::mutex> lock(mutex_);
+		linear = 0.0;
+		angular = 0.0;
+		m_bpending_ = false;
+		RCLCPP_WARN(this->get_logger(), "속도 명령이 %.1f초 동안 없어 정지합니다", elapsed.count());
+	}
+
 	// 일시적인 노이즈로 오탐하지 않도록 구형 ACK 가 연속으로 들어올 때만 비호환으로 판정한다.
 	static constexpr int kLegacyAckThreshold = 20;
 	int legacy_ack_streak_ = 0;
@@ -372,7 +403,7 @@ public:
 		drive_board_incompatible_publisher->publish(msg);
 		if(incompatible) {
 			RCLCPP_ERROR(this->get_logger(),
-				"구동보드 펌웨어가 구버전입니다 (velocity2 미지원, 응답 02 32 03). 구동보드를 업데이트하세요.");
+				"구동보드가 velocity2 주행 명령을 처리하지 못했습니다 (FLAG_FAIL 응답 02 32 03). 구동보드 모드·에러 상태와 펌웨어 버전을 확인하세요.");
 		} else {
 			RCLCPP_INFO(this->get_logger(), "구동보드 velocity2 응답 정상");
 		}
@@ -464,6 +495,7 @@ public:
 		if(m_bpending_) return;
 		linear = vel->linear.x;
 		angular = vel->angular.z;
+		MarkVelocityCommand();
 	}
 
 	void velCallback2(const geometry_msgs::msg::Twist::SharedPtr vel)
@@ -472,6 +504,7 @@ public:
 		m_bpending_ = true;
 		linear = vel->linear.x;
 		angular = vel->angular.z;
+		MarkVelocityCommand();
 
 		if(linear == 0.0 && angular == 0.0)
 		{
@@ -483,6 +516,7 @@ public:
 	{
 		linear = vel->linear.x;
 		angular = vel->angular.z;
+		MarkVelocityCommand();
 	}
 	
 	void accelCallback(const std_msgs::msg::Int32::SharedPtr msg)
@@ -556,6 +590,7 @@ public:
 			{
 				linear = (joy_linear * (double)joy->axes[1] + bt_linear) / 3.0;
 				angular = ((double)joy_angular * (joy->axes[1] >= 0 ? joy->axes[2] : (joy->axes[2] * -1)) + bt_angular) / 3.0;
+				MarkVelocityCommand();
 			}
 		}
 	}
@@ -608,11 +643,31 @@ public:
 
 private:
 	rclcpp::Service<interfaces::srv::ParameterRead>::SharedPtr parameter_read_srv;
+	rclcpp::Service<interfaces::srv::PowerVersionRead>::SharedPtr drive_version_read_srv;
 	rclcpp::Service<interfaces::srv::ParameterWrite>::SharedPtr parameter_write_srv;
 	rclcpp::Service<interfaces::srv::SetMoveMode>::SharedPtr set_move_mode_srv;
 	rclcpp::Service<interfaces::srv::LinearPositionMove>::SharedPtr linear_position_move_srv;
 	rclcpp::Service<interfaces::srv::AngularPositionMove>::SharedPtr angular_position_move_srv;
 	rclcpp::Service<interfaces::srv::Servo>::SharedPtr servo_srv;
+
+	// 응답 문자열 "12605130" = 보드 종류 1, 2026-05-13, 버전 0 → 필드마다 숫자 한 자리씩 담는다
+	bool Drive_Version_Read_Command(const std::shared_ptr<interfaces::srv::PowerVersionRead::Request> request, const std::shared_ptr<interfaces::srv::PowerVersionRead::Response> response)
+	{
+		(void)request;
+		char version[DRVM_VERSION_LENGTH + 1] = {0};
+		response->command_result = (dssp_rs232_drv_module_read_version(version) == 0);
+		if(!response->command_result) return true;
+
+		response->d0_board_type = version[0] - '0';
+		response->d1_year2 = version[1] - '0';
+		response->d2_year1 = version[2] - '0';
+		response->d3_month2 = version[3] - '0';
+		response->d4_month1 = version[4] - '0';
+		response->d5_day2 = version[5] - '0';
+		response->d6_day1 = version[6] - '0';
+		response->d7_ver = version[7] - '0';
+		return true;
+	}
 
 	bool Parameter_Read_Command(const std::shared_ptr<interfaces::srv::ParameterRead::Request> request, const std::shared_ptr<interfaces::srv::ParameterRead::Response> response)
 	{
@@ -747,6 +802,7 @@ int main(int argc, char * argv[])
 	while (rclcpp::ok() && !stop_requested)
 	{
 		rclcpp::spin_some(node);
+		node->StopIfVelocityCommandStale();
 
 		input_linear = linear;
 		input_angular = angular;
