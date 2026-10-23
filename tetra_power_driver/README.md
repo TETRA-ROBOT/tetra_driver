@@ -11,6 +11,7 @@
 - sensor_msgs
 - geometry_msgs
 - interfaces (사용자 정의 메시지 및 서비스 패키지)
+- tetra_serial (같은 레포의 RS232 공용 패키지)
 
 ## 설치 및 빌드 방법
 1. 워크스페이스 루트에서 다음 명령어를 실행합니다:
@@ -19,9 +20,7 @@
    ```
 
 ## 주요 파일 설명
-### include/
-- **`rs232.h`**: RS232 포트 열기, 닫기 및 터미널 설정 관련 함수 정의.
-- **`rs232_common.h`**: RS232 통신 프로토콜 및 유틸리티 함수 정의.
+RS232 포트 설정과 패킷 읽기·쓰기는 `tetra_serial` 패키지(`tetra_serial/rs232*.h`)를 씁니다.
 
 ### src/
 - **`tetra_power_driver.cpp`**: ROS2 노드의 메인 파일로, 하드웨어 제어 및 상태 정보를 처리합니다.
@@ -33,6 +32,19 @@
 - **`tetra_power_driver_launch.xml`**: XML 형식의 launch 파일.
 - **`tetra_*_power_driver.launch.py`**: 로봇 모델별 launch 파일.
 
+## 파라미터
+| 이름 | 기본값 | 설명 |
+|---|---|---|
+| `port` | `/dev/ttyS1` | 전원 보드 시리얼 포트 |
+| `m_bConveyor_option` | `false` | 컨베이어 센서·동작 상태 발행 |
+| `m_bUltrasonic_option` | `false` | 초음파 센서 켜기·발행 |
+
+## 통신 오류 처리
+- 모든 서비스의 `command_result` 는 보드 응답 결과입니다. 응답이 없거나 깨지면 `false` 이고, 값은 쓰지 마세요.
+- 전원 보드를 연속 3번(약 0.7초) 읽지 못하면 `/power_status` 에 -10 을 한 번 보내 구동 드라이버가 서보를 끄게 하고,
+  끊긴 동안 `/servo_on` 2 를 계속 보냅니다. 2초마다 포트를 다시 열고, 다시 연결되면 초기 명령(충전 포트, 초음파)을 다시 보냅니다.
+- 끊김은 한 번만 로그와 `/home/tetra/LOG/*_error.txt` 로 남깁니다.
+
 ## 주요 노드 및 서비스
 ### 노드
 - **`tetra_power_driver`**: 전원 보드 하드웨어와 통신하며, 전원/배터리/센서 데이터 및 제어 명령을 처리합니다.
@@ -43,11 +55,11 @@
 - **`/led_toggle_cmd`**: LED의 토글 상태를 제어합니다.
 - **`/turn_on_cmd`**: 특정 장치를 활성화합니다.
 - **`/log_cmd`**: 통합 로그 데이터를 처리합니다.
-- **`/Power_set_outport_cmd`**: 출력 포트를 설정합니다.
-- **`/Power_get_io_status_cmd`**: IO 상태를 읽습니다.
-- **`/Power_set_enable_cmd`**: 출력 포트를 활성화합니다.
-- **`/Power_set_single_outport_cmd`**: 단일 출력 포트를 설정합니다.
-- **`/Power_set_single_enable_cmd`**: 단일 출력 포트를 활성화합니다.
+- **`/Power_outport_cmd`**: 출력 포트를 설정합니다.
+- **`/Power_io_status_cmd`**: IO 상태를 읽습니다.
+- **`/Power_enable_cmd`**: 출력 포트를 활성화합니다.
+- **`/Power_single_outport_cmd`**: 단일 출력 포트를 설정합니다.
+- **`/Power_single_enable_cmd`**: 단일 출력 포트를 활성화합니다.
 - **`/Power_wheel_enable_cmd`**: 휠 전원을 활성화합니다.
 - **`/Power_parameter_read_cmd`**: 파라미터를 읽습니다.
 - **`/Power_parameter_write_cmd`**: 파라미터를 설정합니다.

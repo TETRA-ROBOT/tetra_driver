@@ -1,30 +1,31 @@
 
 #include <stdio.h>
 #include <malloc.h>
-#include "rs232.h"
+#include "tetra_serial/rs232.h"
 #include "dssp_rs232_drive_module.h"
 #include "drive_module.h"
 
-int _drv = 0;
+// 열린 포트가 없으면 -1. open() 은 실패 시 -1 을 돌려주므로 0 으로 판단하면 실패를 성공으로 본다
+int _drv = -1;
 
 int dssp_rs232_drv_module_create(const char *device, int time_out)
 {
-	if(_drv != 0) {
+	if(_drv >= 0) {
 		drvm_deinit(_drv);
-		_drv = 0;
+		_drv = -1;
 	}
 
 	_drv = drvm_init(device, time_out);
 	
-	if(_drv == 0) return -1;
+	if(_drv < 0) return -1;
 	else return 0;
 }
 
 void dssp_rs232_drv_module_destroy()
 {
-	if(_drv != 0) {
+	if(_drv >= 0) {
 		drvm_deinit(_drv);
-		_drv = 0;
+		_drv = -1;
 	}
 }
 

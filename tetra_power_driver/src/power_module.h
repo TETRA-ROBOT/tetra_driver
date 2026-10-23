@@ -1,4 +1,4 @@
-#include "rs232.h"
+#include "tetra_serial/rs232.h"
 
 typedef struct DATA
 {

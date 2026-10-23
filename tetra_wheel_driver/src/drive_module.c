@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <termios.h>
 #include "drive_module.h"
-#include "rs232_common.h"
+#include "tetra_serial/rs232_common.h"
 
 
 int m_check_X = 0;
@@ -32,14 +32,18 @@ int drvm_init(const char *device, int time_out)
 		return -1;
 	}
 
-	set_terminal(fd, 115200, (int)(time_out/100));
+	if(set_terminal(fd, 115200, (int)(time_out/100)) != 0)
+	{
+		close_port(fd);
+		return -1;
+	}
 
 	return fd;
 }
 
 void drvm_deinit(int fd)
 {
-	close(fd);
+	if(fd >= 0) close(fd);
 }
 
 
@@ -48,7 +52,7 @@ int drvm_set_servo(int fd, int mode)
 	int ret;
 	unsigned char packet_buf[256] = {STX, 'D', 'B'};
 	
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	if(mode == 1) {//on
 		packet_buf[3] = '1';
@@ -61,12 +65,12 @@ int drvm_set_servo(int fd, int mode)
 	packet_buf[5] = ETX;
 	packet_buf[6] = make_lrc(&packet_buf[1], 5);
 
-	ret = write(fd, packet_buf, 7);
+	ret = send_packet(fd, packet_buf, 7);
 	//fflush(fd);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
+	ret = get_response(fd, packet_buf, sizeof(packet_buf));
 	//fflush(fd);
 	return ret;
 }
@@ -76,16 +80,16 @@ int drvm_set_velocity_mode(int fd)
 	int ret;
 	unsigned char packet_buf[256] = {STX, 'C', 'Z', '1', '1', ETX};
 	
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	packet_buf[6] = make_lrc(&packet_buf[1], 5);
 
-	ret = write(fd, packet_buf, 7);
+	ret = send_packet(fd, packet_buf, 7);
 	//fflush(fd);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
+	ret = get_response(fd, packet_buf, sizeof(packet_buf));
 	//fflush(fd);
 	return ret;
 }
@@ -95,16 +99,16 @@ int drvm_set_position_mode(int fd)
 	int ret;
 	unsigned char packet_buf[256] = {STX, 'C', 'Z', '0', '0', ETX};
 	
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	packet_buf[6] = make_lrc(&packet_buf[1], 5);
 
-	ret = write(fd, packet_buf, 7);
+	ret = send_packet(fd, packet_buf, 7);
 	//fflush(fd);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
+	ret = get_response(fd, packet_buf, sizeof(packet_buf));
 	//fflush(fd);
 	return ret;
 }
@@ -115,16 +119,16 @@ int drvm_set_drive_err_reset(int fd)
 	int ret;
 	unsigned char packet_buf[256] = {STX, 'C', 'G', ETX};
 	
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	packet_buf[4] = make_lrc(&packet_buf[1], 3);
 
-	ret = write(fd, packet_buf, 5);
+	ret = send_packet(fd, packet_buf, 5);
 	//fflush(fd);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
+	ret = get_response(fd, packet_buf, sizeof(packet_buf));
 	//fflush(fd);
 	return ret;
 }
@@ -135,7 +139,7 @@ int drvm_set_odometry(int fd, int x, int y, int theta)
 	int index;
 	unsigned char packet_buf[256] = {STX, 'C', 'X'};
 
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	index = 3;
 	ret = int2str(&packet_buf[index], x);
@@ -168,12 +172,12 @@ int drvm_set_odometry(int fd, int x, int y, int theta)
 	packet_buf[index] = make_lrc(&packet_buf[1], index-1);
 	index++;
 
-	ret = write(fd, packet_buf, index);
+	ret = send_packet(fd, packet_buf, index);
 	//fflush(fd);
 	if(ret <= 0) return -2;
 	
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
+	ret = get_response(fd, packet_buf, sizeof(packet_buf));
 	//fflush(fd);
 
 	return ret;
@@ -185,7 +189,7 @@ int drvm_set_velocity(int fd, int left, int right)
 	int index;
 	unsigned char packet_buf[255] = {STX, 'B', 'E'};
 
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	index = 3;
 	ret = int2str(&packet_buf[index], left);
@@ -210,12 +214,12 @@ int drvm_set_velocity(int fd, int left, int right)
 	packet_buf[index] = make_lrc(&packet_buf[1], index-1);
 	index++;
 
-	ret = write(fd, packet_buf, index);
+	ret = send_packet(fd, packet_buf, index);
 	//fflush(fd);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
+	ret = get_response(fd, packet_buf, sizeof(packet_buf));
 	//fflush(fd);
 
 	return ret;
@@ -227,7 +231,7 @@ int drvm_set_position(int fd, int type, int pass, int data)
 	int index;
 	unsigned char packet_buf[255] = {STX, 'B', 'D'};
 
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	int2str(&packet_buf[3], type);
 	int2str(&packet_buf[4], pass);
@@ -245,12 +249,12 @@ int drvm_set_position(int fd, int type, int pass, int data)
 	packet_buf[index] = make_lrc(&packet_buf[1], index-1);
 	index++;
 
-	ret = write(fd, packet_buf, index);
+	ret = send_packet(fd, packet_buf, index);
 	//fflush(fd);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
+	ret = get_response(fd, packet_buf, sizeof(packet_buf));
 
 
 	return ret;
@@ -264,16 +268,16 @@ int drvm_read_bumper_emg(int fd, int *bumper, int *emg_state, int *left_error_co
 	int emg_val;
 	int binary[16] = {0};
 
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	packet_buf[4] = make_lrc(&packet_buf[1], 3);
 
-	ret = write(fd, packet_buf, 5);
+	ret = send_packet(fd, packet_buf, 5);
 	//fflush(fd);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
+	ret = get_response(fd, packet_buf, sizeof(packet_buf));
 	if(ret !=0 ) return ret;
 
 	//Error Code add...
@@ -302,18 +306,17 @@ int drvm_read_drive_err(int fd, unsigned char *left_wheel_err, unsigned char *ri
 {
 	int ret;
 	unsigned char packet_buf[256] = {STX, 'A', 'A', ETX};
-	int binary[16] = {0};
 
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	packet_buf[4] = make_lrc(&packet_buf[1], 3);
 
-	ret = write(fd, packet_buf, 5);
+	ret = send_packet(fd, packet_buf, 5);
 	//fflush(fd);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
+	ret = get_response(fd, packet_buf, sizeof(packet_buf));
 	if(ret != 0 ) return ret;
 
 	*left_wheel_err = packet_buf[3];
@@ -327,22 +330,22 @@ int drvm_read_encoder(int fd, int *left, int *right)
 	int ret;
 	char tmp[11];
 
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	packet_buf[5] = make_lrc(&packet_buf[1], 4);
 
-	ret = write(fd, packet_buf, 6);
+	ret = send_packet(fd, packet_buf, 6);
 	//fflush(fd);
 	if(ret <= 0) return -2;
 
-	ret = get_response(fd, packet_buf);
+	ret = get_response(fd, packet_buf, sizeof(packet_buf));
 	if(ret != 0 ) return ret;
 
 	memcpy(tmp, &packet_buf[2], 10);
-	tmp[11] = '\0';
+	tmp[10] = '\0';
 	*left = atoi(tmp);
 	memcpy(tmp, &packet_buf[12], 10);
-	tmp[11] = '\0';
+	tmp[10] = '\0';
 	*right = atoi(tmp);
 
 	return ret;
@@ -354,27 +357,27 @@ int drvm_read_odometry(int fd, double *Xpos_mm, double *Ypos_mm, double *deg)
 	int ret;
 	char tmp[11];
 
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	packet_buf[5] = make_lrc(&packet_buf[1], 4);
 
-	ret = write(fd, packet_buf, 6);
+	ret = send_packet(fd, packet_buf, 6);
 	//fflush(fd);
 	if(ret <= 0) return -2;
 
-	ret = get_response(fd, packet_buf);
+	ret = get_response(fd, packet_buf, sizeof(packet_buf));
 	if(ret != 0 ) return ret;
 
 	memcpy(tmp, &packet_buf[2], 10);
-	tmp[11] = '\0';
+	tmp[10] = '\0';
 	*Xpos_mm = atof(tmp);
 
 	memcpy(tmp, &packet_buf[12], 10);
-	tmp[11] = '\0';
+	tmp[10] = '\0';
 	*Ypos_mm = atof(tmp);
 
 	memcpy(tmp, &packet_buf[22], 10);
-	tmp[11] = '\0';
+	tmp[10] = '\0';
 	*deg = atof(tmp);
 
 	// for(int i=0; i<35; i++)
@@ -393,7 +396,7 @@ int drvm_read_parameter(int fd, int param, int *value)
 	int index = 3;
 	unsigned int val[255] = {0};
 
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	ret = int2str(&packet_buf[index], param);
 	index += ret;
@@ -402,9 +405,10 @@ int drvm_read_parameter(int fd, int param, int *value)
 	index++;
 	packet_buf[index] = make_lrc(&packet_buf[1], index-1);
 	index++;
-	ret = write(fd, packet_buf, index);
+	ret = send_packet(fd, packet_buf, index);
+	if(ret <= 0) return -2;
 
-	ret = get_response(fd, packet_buf);
+	ret = get_response(fd, packet_buf, sizeof(packet_buf));
 	if(ret != 0 ) return ret;
 
 	str2int(packet_buf, val); 
@@ -421,7 +425,7 @@ int drvm_set_parameter(int fd, int param, int value)
 	int ret;
 	int index = 3;
 
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	if(param <= 9)
 	{
@@ -442,15 +446,16 @@ int drvm_set_parameter(int fd, int param, int value)
 	index++;
 	packet_buf[index] = make_lrc(&packet_buf[1], index-1);
 	index++;
-	ret = write(fd, packet_buf, index);
-	ret = get_response(fd, packet_buf);
+	ret = send_packet(fd, packet_buf, index);
+	if(ret <= 0) return -2;
+	ret = get_response(fd, packet_buf, sizeof(packet_buf));
 	if(ret) return -1;
 	
 	packet_buf2[4] = make_lrc(&packet_buf2[1], 3);
-	ret = write(fd, packet_buf2, 5);
-	//fflush(fd);
+	ret = send_packet(fd, packet_buf2, 5);
+	if(ret <= 0) return -2;
 
-	ret = get_response(fd, packet_buf2);
+	ret = get_response(fd, packet_buf2, sizeof(packet_buf2));
 	if(packet_buf2[1] == 0x34) ret = 0;
 
 	//fflush(fd);
@@ -465,7 +470,7 @@ int drvm_set_Charge_On(int fd)
 	int ret;
 	unsigned char packet_buf[256] = {STX, 'P', 'E'};
 	
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	packet_buf[3] = '2';
 	packet_buf[4] = '5';
@@ -474,12 +479,12 @@ int drvm_set_Charge_On(int fd)
 	packet_buf[6] = ETX;
 	packet_buf[7] = make_lrc(&packet_buf[1], 6);
 
-	ret = write(fd, packet_buf, 8);
+	ret = send_packet(fd, packet_buf, 8);
 	//fflush(fd);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
+	ret = get_response(fd, packet_buf, sizeof(packet_buf));
 	//fflush(fd);
 	return ret;
 }
@@ -489,7 +494,7 @@ int drvm_set_Charge_Off(int fd)
 	int ret;
 	unsigned char packet_buf[256] = {STX, 'P', 'E'};
 	
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	packet_buf[3] = '1';
 	packet_buf[4] = '2';
@@ -498,12 +503,12 @@ int drvm_set_Charge_Off(int fd)
 	packet_buf[6] = ETX;
 	packet_buf[7] = make_lrc(&packet_buf[1], 6);
 
-	ret = write(fd, packet_buf, 8);
+	ret = send_packet(fd, packet_buf, 8);
 	//fflush(fd);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
+	ret = get_response(fd, packet_buf, sizeof(packet_buf));
 	//fflush(fd);
 	return ret;
 }
@@ -520,8 +525,7 @@ int drvm_read_version(int fd, char *version)
 
 	if(fd < 0) return -1;
 	packet_buf[4] = make_lrc(&packet_buf[1], 3);
-	tcflush(fd, TCIFLUSH);
-	if(write(fd, packet_buf, 5) <= 0) return -2;
+	if(send_packet(fd, packet_buf, 5) <= 0) return -2;
 
 	do {
 		if(read(fd, &received, 1) <= 0) return -3;
@@ -555,8 +559,6 @@ static int is_legacy_velocity2_ack(const unsigned char *packet_buf)
 int drvm_set_velocity2(int fd, int left, int right, double *x, double *y, double *theta, double *velocity_l, double *velocity_r, int *bumper, int *emg)
 {
 	int ret;
-	int index;
-	int lrc_val;
 	unsigned char packet_buf[255] = {STX, 'B','V'};
 
 	//Left//
@@ -583,14 +585,17 @@ int drvm_set_velocity2(int fd, int left, int right, double *x, double *y, double
 	packet_buf[7] = ETX;
 	packet_buf[8] = make_lrc(&packet_buf[1], 7);
 
-	ret = write(fd, packet_buf, 9);
+	ret = send_packet(fd, packet_buf, 9);
 	// printf("[write] %02X | %02X | %02X | %02X | %02X | %02X | %02X | %02X | %02X \n", 
 	// 		packet_buf[0] ,packet_buf[1], packet_buf[2], packet_buf[3], packet_buf[4], packet_buf[5], packet_buf[6], packet_buf[7], packet_buf[8]);
 
 	if(ret <= 0) return -2;
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response2(fd, packet_buf);
-	if(packet_buf[0] == 0x02 && (packet_buf[1] == 0x30 || packet_buf[1] == 0x32) && packet_buf[18] == 0x03)
+	ret = get_response_fixed(fd, packet_buf, sizeof(packet_buf), 20);
+	// FLAG_FAIL(0x32) 프레임도 odometry 를 싣고 오므로 받아들이되, LRC 가 맞을 때만 쓴다.
+	// 깨진 프레임으로 x·y·θ 를 덮어쓰면 오도메트리가 한 주기 튄다.
+	if(packet_buf[0] == 0x02 && (packet_buf[1] == 0x30 || packet_buf[1] == 0x32) && packet_buf[18] == 0x03
+		&& packet_buf[19] == make_lrc(&packet_buf[1], 18))
 	{
 		s_velocity2_response = DRVM_RESP_OK;
 		m_check_X = (packet_buf[2] >> 7);

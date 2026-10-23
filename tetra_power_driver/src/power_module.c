@@ -1,10 +1,20 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 #include <string.h>
 #include <unistd.h>
 #include <termios.h>
 #include "power_module.h"
-#include "rs232_common.h"
+#include "tetra_serial/rs232_common.h"
+
+/* 전원 보드의 ASCII 응답을 읽는다. 성공 0, 실패 -1.
+ * 전원 보드는 FLAG 자리에 데이터를 싣는 응답이 있어 FLAG·LRC 는 검사하지 않는다 (예전 동작 유지).
+ * get_response_raw 는 읽은 길이를 주는데, 예전에는 그 길이를 그대로 돌려줘서
+ * "0 이 성공" 으로 검사하는 호출부(파라미터 저장의 flash 쓰기 등)가 항상 실패로 빠졌다 */
+static int read_ascii_reply(int fd, unsigned char *data, size_t size)
+{
+	return get_response_raw(fd, data, size) > 0 ? 0 : -1;
+}
 
 DATA m_data;
 
@@ -17,7 +27,11 @@ int power_init(const char *device, int time_out)
 		return -1;
 	}
 
-	set_terminal(fd, 115200, (int)(time_out/100));
+	if(set_terminal(fd, 115200, (int)(time_out/100)) != 0)
+	{
+		close_port(fd);
+		return -1;
+	}
 
 	memset(&m_data, 0, sizeof(DATA)); //initialize struct
 
@@ -26,7 +40,7 @@ int power_init(const char *device, int time_out)
 
 void power_deinit(int fd)
 {
-	close(fd);
+	if(fd >= 0) close(fd);
 }
 
 int power_set_light(int fd, int id, int brightness)
@@ -35,7 +49,7 @@ int power_set_light(int fd, int id, int brightness)
 	int index;
 	unsigned char packet_buf[255] = {STX, 'L', 'I'};
 
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	index = 3;
 	ret = int2str(&packet_buf[index], id);
@@ -60,11 +74,11 @@ int power_set_light(int fd, int id, int brightness)
 	packet_buf[index] = make_lrc(&packet_buf[1], index-1);
 	index++;
 
-	ret = write(fd, packet_buf, index);
+	ret = send_packet(fd, packet_buf, index);
 	if(ret <= 0) return -2;
 	
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
+	ret = read_ascii_reply(fd, packet_buf, sizeof(packet_buf));
 
 	return ret;
 }
@@ -75,7 +89,7 @@ int power_set_Single_OutputPort(int fd, int id, int value)
 	int index;
 	unsigned char packet_buf[255] = {STX, 'P', 'o'};
 
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	index = 3;
 	ret = int2str(&packet_buf[index], id);
@@ -100,11 +114,11 @@ int power_set_Single_OutputPort(int fd, int id, int value)
 	packet_buf[index] = make_lrc(&packet_buf[1], index-1);
 	index++;
 
-	ret = write(fd, packet_buf, index);
+	ret = send_packet(fd, packet_buf, index);
 	if(ret <= 0) return -2;
 	
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
+	ret = read_ascii_reply(fd, packet_buf, sizeof(packet_buf));
 
 	return ret;
 }
@@ -115,7 +129,7 @@ int power_set_Single_Enable(int fd, int id, int value)
 	int index;
 	unsigned char packet_buf[255] = {STX, 'P', 'e'};
 
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	index = 3;
 	ret = int2str(&packet_buf[index], id);
@@ -140,11 +154,11 @@ int power_set_Single_Enable(int fd, int id, int value)
 	packet_buf[index] = make_lrc(&packet_buf[1], index-1);
 	index++;
 
-	ret = write(fd, packet_buf, index);
+	ret = send_packet(fd, packet_buf, index);
 	if(ret <= 0) return -2;
 	
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
+	ret = read_ascii_reply(fd, packet_buf, sizeof(packet_buf));
 
 	return ret;
 }
@@ -155,7 +169,7 @@ int power_toggle_on(int fd, int id)
 	int index;
 	unsigned char packet_buf[255] = {STX, 'L', 'T'};
 
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	index = 3;
 	ret = int2str(&packet_buf[index], id);
@@ -171,11 +185,11 @@ int power_toggle_on(int fd, int id)
 	packet_buf[index] = make_lrc(&packet_buf[1], index-1);
 	index++;
 
-	ret = write(fd, packet_buf, index);
+	ret = send_packet(fd, packet_buf, index);
 	if(ret <= 0) return -2;
 	
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
+	ret = read_ascii_reply(fd, packet_buf, sizeof(packet_buf));
 
 	return ret;
 }
@@ -187,7 +201,7 @@ int power_set_light_toggle(int fd, int de_index, int lightAcc1, int H_brightness
 	int index;
 	unsigned char packet_buf[255] = {STX, 'L', 'D'};
 
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	index = 3;
 	ret = int2str(&packet_buf[index], de_index);
@@ -238,11 +252,11 @@ int power_set_light_toggle(int fd, int de_index, int lightAcc1, int H_brightness
 	packet_buf[index] = make_lrc(&packet_buf[1], index-1);
 	index++;
 
-	ret = write(fd, packet_buf, index);
+	ret = send_packet(fd, packet_buf, index);
 	if(ret <= 0) return -2;
 	
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
+	ret = read_ascii_reply(fd, packet_buf, sizeof(packet_buf));
 
 	return ret;
 }
@@ -254,13 +268,13 @@ int power_read_bumper(int fd, int *bumper)
 	int bumper_val;
 	int binary[16] = {0};
 
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 	packet_buf[4] = make_lrc(&packet_buf[1], 3);
-	ret = write(fd, packet_buf, 5);
+	ret = send_packet(fd, packet_buf, 5);
 
 	if(ret <= 0) return -2;
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
+	ret = read_ascii_reply(fd, packet_buf, sizeof(packet_buf));
 	if(ret !=0 ) return ret;
 
 	memset(binary, 0, sizeof(int)*16);
@@ -285,20 +299,18 @@ int power_read_Battery(int fd, double *dbattery, double *dVoltage, double *dCurr
 	int  Input_binary[8] = {0,};
 	int Output_binary[8] = {0,};
 
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	packet_buf[4] = make_lrc(&packet_buf[1], 3);
 
-	ret = write(fd, packet_buf, 5);
+	ret = send_packet(fd, packet_buf, 5);
 	//fflush(fd);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response2(fd, packet_buf);
-	if(packet_buf[1] == 0x02) //Packet Error Pass..
-	{
-		return -1;
-	}
+	ret = get_response_length_prefixed(fd, packet_buf, sizeof(packet_buf));
+	// 실패한 응답을 해석하면 0·쓰레기 값이 실제 측정값처럼 나간다
+	if(ret != 0) return ret;
 	
 	//Battery Level
 	int ibattery = (packet_buf[4] & 0xff) | ((packet_buf[3] << 8) & 0xff00);
@@ -334,20 +346,18 @@ int power_read_tetra(int fd, double *dbattery, double *dVoltage, double *dCurren
 	int  Input_binary[8] = {0,};
 	int Output_binary[8] = {0,};
 
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	packet_buf[4] = make_lrc(&packet_buf[1], 3);
 
-	ret = write(fd, packet_buf, 5);
+	ret = send_packet(fd, packet_buf, 5);
 	//fflush(fd);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response2(fd, packet_buf);
-	if(packet_buf[1] == 0x02) //Packet Error Pass..
-	{
-		return -3;
-	}
+	ret = get_response_length_prefixed(fd, packet_buf, sizeof(packet_buf));
+	// 실패한 응답을 해석하면 0·쓰레기 값이 실제 측정값처럼 나간다
+	if(ret != 0) return ret;
 	
 	//Battery Level
 	int ibattery = (packet_buf[4] & 0xff) | ((packet_buf[3] << 8) & 0xff00);
@@ -389,17 +399,15 @@ int  power_read_Ultrasonic(int fd,  double *Ultrasonic)
 {
 	unsigned char packet_buf[255] = {STX, 'P','N', ETX};
 	int ret;
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 	packet_buf[4] = make_lrc(&packet_buf[1], 3);
-	ret = write(fd, packet_buf, 5);
+	ret = send_packet(fd, packet_buf, 5);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response2(fd, packet_buf);
-	if(packet_buf[1] == 0x02) //Packet Error Pass..
-	{
-		return -1;
-	}
+	ret = get_response_length_prefixed(fd, packet_buf, sizeof(packet_buf));
+	// 실패한 응답을 해석하면 0·쓰레기 값이 실제 측정값처럼 나간다
+	if(ret != 0) return ret;
 
 	int _m_Sonar_1 = (packet_buf[6] & 0xff) | ((packet_buf[5] << 8) & 0xff00);
 	Ultrasonic[1] = _m_Sonar_1 / 1000.0;
@@ -419,7 +427,7 @@ int power_set_Ultrasonic(int fd, int mode)
 	int ret;
 	unsigned char packet_buf[255] = {STX, 'P', 'S'};
 	
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	if(mode == 1)//On
 	{
@@ -432,11 +440,11 @@ int power_set_Ultrasonic(int fd, int mode)
 	packet_buf[4] = ETX;
 	packet_buf[5] = make_lrc(&packet_buf[1], 4);
 
-	ret = write(fd, packet_buf, 6);
+	ret = send_packet(fd, packet_buf, 6);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
+	ret = read_ascii_reply(fd, packet_buf, sizeof(packet_buf));
 	return ret;
 }
 
@@ -446,17 +454,15 @@ int  power_data_read(int fd, int *idata_0, int *idata_1, int *idata_2, int *idat
 {
 	unsigned char packet_buf[255] = {STX, 'P','D', ETX};
 	int ret;
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 	packet_buf[4] = make_lrc(&packet_buf[1], 3);
-	ret = write(fd, packet_buf, 5);
+	ret = send_packet(fd, packet_buf, 5);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response2(fd, packet_buf);
-	if(packet_buf[1] == 0x02) //Packet Error Pass..
-	{
-		return -1;
-	}
+	ret = get_response_length_prefixed(fd, packet_buf, sizeof(packet_buf));
+	// 실패한 응답을 해석하면 0·쓰레기 값이 실제 측정값처럼 나간다
+	if(ret != 0) return ret;
 
 	int m_data0 = (packet_buf[4] & 0xff) | ((packet_buf[3] << 8) & 0xff00);
 	*idata_0 = m_data0;
@@ -490,17 +496,15 @@ int  power_adc_read(int fd, int *iADB_0, int *iADB_1, int *iADB_2, int *iADB_3,
 {
 	unsigned char packet_buf[255] = {STX, 'P','A', ETX};
 	int ret;
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 	packet_buf[4] = make_lrc(&packet_buf[1], 3);
-	ret = write(fd, packet_buf, 5);
+	ret = send_packet(fd, packet_buf, 5);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response2(fd, packet_buf);
-	if(packet_buf[1] == 0x02) //Packet Error Pass..
-	{
-		return -1;
-	}
+	ret = get_response_length_prefixed(fd, packet_buf, sizeof(packet_buf));
+	// 실패한 응답을 해석하면 0·쓰레기 값이 실제 측정값처럼 나간다
+	if(ret != 0) return ret;
 
 	*iADB_0 = (packet_buf[4] & 0xff) | ((packet_buf[3] << 8) & 0xff00);
 	*iADB_1 = (packet_buf[6] & 0xff) | ((packet_buf[5] << 8) & 0xff00);
@@ -524,10 +528,9 @@ int  power_version_read(int fd, int *idata_0, int *idata_1, int *idata_2, int *i
 	int length = 0;
 	int *digits[8] = {idata_0, idata_1, idata_2, idata_3, idata_4, idata_5, idata_6, idata_7};
 
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 	packet_buf[4] = make_lrc(&packet_buf[1], 3);
-	tcflush(fd, TCIFLUSH);
-	if(write(fd, packet_buf, 5) <= 0) return -2;
+	if(send_packet(fd, packet_buf, 5) <= 0) return -2;
 
 	do {
 		if(read(fd, &received, 1) <= 0) return -3;
@@ -553,17 +556,15 @@ int  power_sonar_read(int fd, int *idata_0, int *idata_1, int *idata_2, int *ida
 {
 	unsigned char packet_buf[255] = {STX, 'P','N', ETX};
 	int ret;
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 	packet_buf[4] = make_lrc(&packet_buf[1], 3);
-	ret = write(fd, packet_buf, 5);
+	ret = send_packet(fd, packet_buf, 5);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response2(fd, packet_buf);
-	if(packet_buf[1] == 0x02) //Packet Error Pass..
-	{
-		return -1;
-	}
+	ret = get_response_length_prefixed(fd, packet_buf, sizeof(packet_buf));
+	// 실패한 응답을 해석하면 0·쓰레기 값이 실제 측정값처럼 나간다
+	if(ret != 0) return ret;
 
 	int m_data0 = (packet_buf[4] & 0xff) | ((packet_buf[3] << 8) & 0xff00);
 	*idata_0 = m_data0;
@@ -585,15 +586,15 @@ int power_flash_write(int fd)
 {
 	int ret;
 	unsigned char packet_buf[255] = {STX, 'P', 'F', ETX};
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	packet_buf[4] = make_lrc(&packet_buf[1], 3);
 
-	ret = write(fd, packet_buf, 5);
+	ret = send_packet(fd, packet_buf, 5);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
+	ret = read_ascii_reply(fd, packet_buf, sizeof(packet_buf));
 
 	return ret;
 }
@@ -604,9 +605,8 @@ int  power_parameter_write(int fd, int id, int data)
 	int index;
 	unsigned char packet_buf[255] = {STX, 'P', 'W'};
 	unsigned char packet_buf2[255] = {STX, 'P', 'F', ETX};
-	printf("power_parameter_write fd: %d\n", fd);
 
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	index = 3;
 	ret = int2str(&packet_buf[index], id);
@@ -629,30 +629,24 @@ int  power_parameter_write(int fd, int id, int data)
 
 	packet_buf[index] = make_lrc(&packet_buf[1], index-1);
 	index++;
-	printf("packet_buf: %s\n", packet_buf);
 
-	ret = write(fd, packet_buf, index);
-	printf("power_parameter_write ret: %d\n", ret);
+	ret = send_packet(fd, packet_buf, index);
 	if(ret <= 0) return -2;
 	
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
-	printf("power_parameter_write ret1: %d\n", ret);
+	ret = read_ascii_reply(fd, packet_buf, sizeof(packet_buf));
 	if(ret) return -1;
 
 	packet_buf2[4] = make_lrc(&packet_buf2[1], 3);
-	printf("packet_buf2: %s\n", packet_buf2);
-	ret = write(fd, packet_buf2, 5);
+	ret = send_packet(fd, packet_buf2, 5);
 	
-	printf("power_parameter_write ret2: %d\n", ret);
 	if(ret <= 0) return -2;
 
 	
 	memset(packet_buf2, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf2);
+	ret = read_ascii_reply(fd, packet_buf2, sizeof(packet_buf2));
 	if(packet_buf2[1] == 0x30) ret = 0;
 	
-	printf("power_parameter_write ret3: %d\n", ret);
 
 	if(ret) return -1;
 	return ret;
@@ -665,7 +659,7 @@ int  conveyor_parameter_write(int fd, int id, int data)
 	unsigned char packet_buf[255] = {STX, 'C', 'W'};
 	unsigned char packet_buf2[255] = {STX, 'C', 'F', ETX};
 
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	index = 3;
 	ret = int2str(&packet_buf[index], id);
@@ -689,23 +683,23 @@ int  conveyor_parameter_write(int fd, int id, int data)
 	packet_buf[index] = make_lrc(&packet_buf[1], index-1);
 	index++;
 
-	ret = write(fd, packet_buf, index);
+	ret = send_packet(fd, packet_buf, index);
 	    
 	if(ret <= 0) return -2;
 		
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
+	ret = read_ascii_reply(fd, packet_buf, sizeof(packet_buf));
 	
 	    
     if(ret) return -1;
 
 	packet_buf2[4] = make_lrc(&packet_buf2[1], 3);
-	ret = write(fd, packet_buf2, 5);
+	ret = send_packet(fd, packet_buf2, 5);
 	if(ret <= 0) return -2;
 
 	
 	memset(packet_buf2, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf2);
+	ret = read_ascii_reply(fd, packet_buf2, sizeof(packet_buf2));
 	if(packet_buf2[1] == 0x30) ret = 0;
 
 	if(ret) return -1;
@@ -720,17 +714,15 @@ int  power_parameter_read(int fd, int *idata_0, int *idata_1, int *idata_2, int 
 {
 	unsigned char packet_buf[255] = {STX, 'P','R', ETX};
 	int ret;
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 	packet_buf[4] = make_lrc(&packet_buf[1], 3);
-	ret = write(fd, packet_buf, 5);
+	ret = send_packet(fd, packet_buf, 5);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response2(fd, packet_buf);
-	if(packet_buf[1] == 0x02) //Packet Error Pass..
-	{
-		return -1;
-	}
+	ret = get_response_length_prefixed(fd, packet_buf, sizeof(packet_buf));
+	// 실패한 응답을 해석하면 0·쓰레기 값이 실제 측정값처럼 나간다
+	if(ret != 0) return ret;
 
 	int m_data0 = (packet_buf[4] & 0xff) | ((packet_buf[3] << 8) & 0xff00);
 	*idata_0 = m_data0;
@@ -806,17 +798,15 @@ int  conveyor_parameter_read(int fd, int *idata_0, int *idata_1, int *idata_2, i
 {
 	unsigned char packet_buf[255] = {STX, 'C','R', ETX};
 	int ret;
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 	packet_buf[4] = make_lrc(&packet_buf[1], 3);
-	ret = write(fd, packet_buf, 5);
+	ret = send_packet(fd, packet_buf, 5);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response2(fd, packet_buf);
-	if(packet_buf[1] == 0x02) //Packet Error Pass..
-	{
-		return -1;
-	}
+	ret = get_response_length_prefixed(fd, packet_buf, sizeof(packet_buf));
+	// 실패한 응답을 해석하면 0·쓰레기 값이 실제 측정값처럼 나간다
+	if(ret != 0) return ret;
 
 	int m_data0 = (packet_buf[4] & 0xff) | ((packet_buf[3] << 8) & 0xff00);
 	*idata_0 = m_data0;
@@ -869,17 +859,15 @@ int  conveyor_data_read(int fd, int *idata_0, int *idata_1, int *idata_2, int *i
 {
 	unsigned char packet_buf[255] = {STX, 'C','D', ETX};
 	int ret;
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 	packet_buf[4] = make_lrc(&packet_buf[1], 3);
-	ret = write(fd, packet_buf, 5);
+	ret = send_packet(fd, packet_buf, 5);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response2(fd, packet_buf);
-	if(packet_buf[1] == 0x02) //Packet Error Pass..
-	{
-		return -1;
-	}
+	ret = get_response_length_prefixed(fd, packet_buf, sizeof(packet_buf));
+	// 실패한 응답을 해석하면 0·쓰레기 값이 실제 측정값처럼 나간다
+	if(ret != 0) return ret;
 
 	int m_data0 = (packet_buf[4] & 0xff) | ((packet_buf[3] << 8) & 0xff00);
 	*idata_0 = m_data0;
@@ -919,7 +907,7 @@ int power_charging_ready(int fd, int on)
 	int ret;
 	unsigned char packet_buf[255] = {STX, 'P', 'C'};
 	
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	if(on == 1)//On
 	{
@@ -932,11 +920,11 @@ int power_charging_ready(int fd, int on)
 	packet_buf[4] = ETX;
 	packet_buf[5] = make_lrc(&packet_buf[1], 4);
 
-	ret = write(fd, packet_buf, 6);
+	ret = send_packet(fd, packet_buf, 6);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
+	ret = read_ascii_reply(fd, packet_buf, sizeof(packet_buf));
 	return ret;
 }
 
@@ -945,17 +933,16 @@ int power_read_Integral_Voltage(int fd, int *V_value)
 {
 	unsigned char packet_buf[1024] = {STX, 'I','V', ETX};
 	int ret;
-	int index = 0;
-	int lrc_val=0;
 
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 	packet_buf[4] = make_lrc(&packet_buf[1], 3);
-	ret = write(fd, packet_buf, 5);
+	ret = send_packet(fd, packet_buf, 5);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*1024);
-	ret = get_response2(fd, packet_buf);
-	if(ret <= 0) return -3;
+	ret = get_response_length_prefixed(fd, packet_buf, sizeof(packet_buf));
+	// 성공이 0 인데 예전에는 ret <= 0 이면 실패로 빠져 로그가 항상 0 으로만 채워졌다
+	if(ret != 0) return -3;
 
 	for(int i=0, j=0; i< 500; i++, j+= 2)
 	{
@@ -972,17 +959,14 @@ int power_read_Integral_Current(int fd, int *I_value)
 	unsigned char packet_buf[1024] = {STX, 'I','C', ETX};
 	int ret;
 
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 	packet_buf[4] = make_lrc(&packet_buf[1], 3);
-	ret = write(fd, packet_buf, 5);
+	ret = send_packet(fd, packet_buf, 5);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*1024);
-	ret = get_response2(fd, packet_buf);
-	if(packet_buf[1] == 0x02) //Packet Error Pass..
-	{
-		return -1;
-	}
+	ret = get_response_length_prefixed(fd, packet_buf, sizeof(packet_buf));
+	if(ret != 0) return ret;
 
 	for(int i=0, j=0; i< 500; i++, j+= 2)
 	{
@@ -994,6 +978,12 @@ int power_read_Integral_Current(int fd, int *I_value)
 	return ret;
 }
 
+
+static int port_mask(int port0, int port1, int port2, int port3, int port4, int port5, int port6, int port7)
+{
+	return (port0 != 0) | (port1 != 0) << 1 | (port2 != 0) << 2 | (port3 != 0) << 3
+		| (port4 != 0) << 4 | (port5 != 0) << 5 | (port6 != 0) << 6 | (port7 != 0) << 7;
+}
 
 // Function to convert binary to decimal
 int binaryToDecimal(long binarynum)
@@ -1015,18 +1005,18 @@ int power_set_OutputPort(int fd, int port0, int port1, int port2, int port3, int
 {
 	int ret;
 	unsigned char packet_buf[255] = { STX, 'P', 'O' };
-	char charValue[10];
-	sprintf(charValue, "%d%d%d%d%d%d%d%d", port7,port6,port5,port4,port3,port2,port1,port0);
 
-	packet_buf[3] = (char)binaryToDecimal(atol(charValue))+'0';
+	if(fd < 0) return -1;
+	// 포트 8개를 비트로 묶는다. 예전에는 "%d" 8개를 char[10] 에 sprintf 해서 0·1 이 아닌 값이 오면 넘쳤다
+	packet_buf[3] = (unsigned char)(port_mask(port0, port1, port2, port3, port4, port5, port6, port7) + '0');
 	packet_buf[4] = ETX;
 	packet_buf[5] = make_lrc(&packet_buf[1], 4);
 
-	ret = write(fd, packet_buf, 6);
+	ret = send_packet(fd, packet_buf, 6);
 	if (ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char) * 255);
-	ret = get_response(fd, packet_buf);
+	ret = read_ascii_reply(fd, packet_buf, sizeof(packet_buf));
 
 	return ret;
 }
@@ -1037,18 +1027,18 @@ int power_set_Enable(int fd, int port0, int port1, int port2, int port3, int por
 {
 	int ret;
 	unsigned char packet_buf[255] = { STX, 'P', 'E' };
-	char charValue[10];
-	sprintf(charValue, "%d%d%d%d%d%d%d%d", port7,port6,port5,port4,port3,port2,port1,port0);
 
-	packet_buf[3] = (char)binaryToDecimal(atol(charValue))+'0';
+	if(fd < 0) return -1;
+	// 포트 8개를 비트로 묶는다. 예전에는 "%d" 8개를 char[10] 에 sprintf 해서 0·1 이 아닌 값이 오면 넘쳤다
+	packet_buf[3] = (unsigned char)(port_mask(port0, port1, port2, port3, port4, port5, port6, port7) + '0');
 	packet_buf[4] = ETX;
 	packet_buf[5] = make_lrc(&packet_buf[1], 4);
 
-	ret = write(fd, packet_buf, 6);
+	ret = send_packet(fd, packet_buf, 6);
 	if (ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char) * 255);
-	ret = get_response(fd, packet_buf);
+	ret = read_ascii_reply(fd, packet_buf, sizeof(packet_buf));
 
 	return ret;
 }
@@ -1058,7 +1048,7 @@ int power_wheel_enable(int fd, int mode)
 	int ret;
 	unsigned char packet_buf[255] = {STX, 'P', 'M'};
 	
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	if(mode == 1) //Start 
 	{
@@ -1071,11 +1061,11 @@ int power_wheel_enable(int fd, int mode)
 	packet_buf[4] = ETX;
 	packet_buf[5] = make_lrc(&packet_buf[1], 4);
 
-	ret = write(fd, packet_buf, 6);
+	ret = send_packet(fd, packet_buf, 6);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
+	ret = read_ascii_reply(fd, packet_buf, sizeof(packet_buf));
 	//printf("packet_buf[1]: %02x \n", packet_buf[1]);
 	return ret;
 }
@@ -1089,17 +1079,15 @@ int power_read_GPIO(int fd,  int *Input, int *Output)
 
 	unsigned char packet_buf2[255] = {STX, 'P','I', ETX};
 	int ret;
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 	packet_buf2[4] = make_lrc(&packet_buf2[1], 3);
-	ret = write(fd, packet_buf2, 5);
+	ret = send_packet(fd, packet_buf2, 5);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf2, 0, sizeof(unsigned char)*255);
-	ret = get_response2(fd, packet_buf2);
-	if(packet_buf2[1] == 0x02) //Packet Error Pass..
-	{
-		return -1;
-	}
+	ret = get_response_length_prefixed(fd, packet_buf2, sizeof(packet_buf2));
+	// 실패한 응답을 해석하면 0·쓰레기 값이 실제 측정값처럼 나간다
+	if(ret != 0) return ret;
 
 
 	int iInput = (packet_buf2[4] & 0xff) | ((packet_buf2[3] << 8) & 0xff00);
@@ -1124,22 +1112,17 @@ int power_conveyor_movement(int fd, int mode)
 	int ret;
 	unsigned char packet_buf[255] = {STX, 'C', 'N'};
 	
-	if(!fd) return -1;
-	printf("power_conveyor_movement mode: %d\n", mode);
+	if(fd < 0) return -1;
 
 	packet_buf[3]= mode+'0';
 	packet_buf[4] = ETX;
 	packet_buf[5] = make_lrc(&packet_buf[1], 4);
-	printf("packet_buf: %s\n", packet_buf);
 
-	ret = write(fd, packet_buf, 6);
+	ret = send_packet(fd, packet_buf, 6);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
-	for (int i=0; i<255; i++){
-		if(packet_buf[i]!=0) printf("power_conveyor_movement packet_buf[%d]: %02x \n", i, packet_buf[i]);
-	}
+	ret = read_ascii_reply(fd, packet_buf, sizeof(packet_buf));
 	return ret;
 }
 
@@ -1147,19 +1130,17 @@ int  power_read_loadcell(int fd,  double *weight)
 {
 	unsigned char packet_buf[255] = {STX, 'C','L', ETX};
 	int ret;
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	packet_buf[4] = make_lrc(&packet_buf[1], 3);
 
-	ret = write(fd, packet_buf, 5);
+	ret = send_packet(fd, packet_buf, 5);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response2(fd, packet_buf);
-	if(packet_buf[1] == 0x02) //Packet Error Pass..
-	{
-		return -1;
-	}
+	ret = get_response_length_prefixed(fd, packet_buf, sizeof(packet_buf));
+	// 실패한 응답을 해석하면 0·쓰레기 값이 실제 측정값처럼 나간다
+	if(ret != 0) return ret;
 
 	
 	int _mWeight = (packet_buf[4] & 0xff) | ((packet_buf[3] << 8) & 0xff00);
@@ -1173,15 +1154,15 @@ int power_loadcell_callibration(int fd)
 {
 	int ret;
 	unsigned char packet_buf[255] = {STX, 'C', 'A', ETX};
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	packet_buf[4] = make_lrc(&packet_buf[1], 3);
 
-	ret = write(fd, packet_buf, 5);
+	ret = send_packet(fd, packet_buf, 5);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
+	ret = read_ascii_reply(fd, packet_buf, sizeof(packet_buf));
 
 	return ret;
 }
@@ -1190,14 +1171,14 @@ int power_read_conveyor_sensor(int fd,  int *Input)
 {
 	unsigned char packet_buf[255] = {STX, 'C','P', ETX};
 	int ret;
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 	packet_buf[4] = make_lrc(&packet_buf[1], 3);
-	ret = write(fd, packet_buf, 5);
+	ret = send_packet(fd, packet_buf, 5);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
-
+	ret = read_ascii_reply(fd, packet_buf, sizeof(packet_buf));
+	if(ret != 0) return ret;
 
 	int iInput = (packet_buf[4] & 0xff) | ((packet_buf[3] << 8) & 0xff00);
 	*Input = iInput;
@@ -1210,7 +1191,7 @@ int power_conveyor_manual_movement(int fd, int on)
 	int ret;
 	unsigned char packet_buf[255] = {STX, 'C', 'C'};
 	
-	if(!fd) return -1;
+	if(fd < 0) return -1;
 
 	if(on == 1) //CW 
 	{
@@ -1227,11 +1208,11 @@ int power_conveyor_manual_movement(int fd, int on)
 	packet_buf[4] = ETX;
 	packet_buf[5] = make_lrc(&packet_buf[1], 4);
 
-	ret = write(fd, packet_buf, 6);
+	ret = send_packet(fd, packet_buf, 6);
 	if(ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response(fd, packet_buf);
+	ret = read_ascii_reply(fd, packet_buf, sizeof(packet_buf));
 	return ret;
 }
 
@@ -1239,14 +1220,14 @@ int power_read_conveyor_movement(int fd, int* result)
 {
 	unsigned char packet_buf[255] = { STX, 'C','S', ETX };
 	int ret;
-	if (!fd) return -1;
+	if(fd < 0) return -1;
 	packet_buf[4] = make_lrc(&packet_buf[1], 3);
-	ret = write(fd, packet_buf, 5);
+	ret = send_packet(fd, packet_buf, 5);
 	if (ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char) * 255);
-	ret = get_response(fd, packet_buf);
-
+	ret = read_ascii_reply(fd, packet_buf, sizeof(packet_buf));
+	if(ret != 0) return ret;
 
 	int iInput = packet_buf[4] & 0x07;
 	*result = iInput;
@@ -1259,13 +1240,14 @@ int power_read_motor_position(int fd, int* result)
 {
 	unsigned char packet_buf[255] = { STX, 'M','L', ETX };
 	int ret;
-	if (!fd) return -1;
+	if(fd < 0) return -1;
 	packet_buf[4] = make_lrc(&packet_buf[1], 3);
-	ret = write(fd, packet_buf, 5);
+	ret = send_packet(fd, packet_buf, 5);
 	if (ret <= 0) return -2;
 
 	memset(packet_buf, 0, sizeof(unsigned char) * 255);
-	ret = get_response(fd, packet_buf);
+	ret = read_ascii_reply(fd, packet_buf, sizeof(packet_buf));
+	if(ret != 0) return ret;
 
 	int combined = (packet_buf[3] << 8) | packet_buf[4];
 
@@ -1280,7 +1262,7 @@ int flexible_command(int fd, const char* cmd_str, char* out_str)
     int cmd_len = strlen(cmd_str);
     int ret;
 
-    if (fd <= 0 || cmd_str == NULL || out_str == NULL) return -1;
+    if (fd < 0 || cmd_str == NULL || out_str == NULL) return -1;
 
     // 1. 송신 패킷 구성 (STX + CMD + ETX + LRC)
     packet_buf[0] = STX; 
@@ -1294,14 +1276,13 @@ int flexible_command(int fd, const char* cmd_str, char* out_str)
     int send_len = cmd_len + 3; // STX(1) + CMD(n) + ETX(1) + LRC(1)
     
     // 데이터 전송
-    ret = write(fd, packet_buf, send_len);
+    ret = send_packet(fd, packet_buf, send_len);
     if (ret <= 0) return -2;
 
     // 2. 응답 수신 대기
     memset(packet_buf, 0, sizeof(packet_buf));
-    // get_response는 실제로 읽은 바이트 수를 반환해야 합니다.
-    ret = get_response(fd, packet_buf); 
-	printf("ret2: %d \n", ret);
+    // 받은 패킷을 그대로 16진수로 보여 주므로 FLAG·LRC 를 검사하지 않고 길이만 받는다
+    ret = get_response_raw(fd, packet_buf, sizeof(packet_buf));
     if (ret <= 0) return -3;
 
     // 3. 수신 패킷 LRC 검증
@@ -1318,7 +1299,6 @@ int flexible_command(int fd, const char* cmd_str, char* out_str)
     // 4. 수신된 패킷을 16진수 문자열로 변환
     out_str[0] = '\0'; // 결과 문자열 초기화
     char temp[8];
-	printf("packet_buf: %s\n", packet_buf);
     for (int i = 0; i < ret; i++) {
         sprintf(temp, "%02X%s", packet_buf[i], (i == ret - 1) ? "" : " ");
         strcat(out_str, temp);

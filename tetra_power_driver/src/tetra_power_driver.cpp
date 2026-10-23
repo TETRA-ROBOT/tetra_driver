@@ -140,10 +140,11 @@ char Textbuffer[BUF_LEN];
 char strPath[BUF_LEN];
 
 std::atomic<bool> stop_requested(false);
+// 시그널 핸들러 안에서는 printf 같은 함수를 쓰면 안 되므로 플래그만 세운다
 void signal_handler(int signal) 
 {
+    (void)signal;
     stop_requested = true;
-    printf("Signal received: %d. Preparing to shutdown...\n", signal);
 }
 
 void Error_Log_write(string log_data)
@@ -363,29 +364,26 @@ public:
 	// Custom Service Callback Functions
 	bool LED_Control_Command(const std::shared_ptr<interfaces::srv::LedControl::Request> request, const std::shared_ptr<interfaces::srv::LedControl::Response> response)
 	{
-		bool bResult = false;
-		dssp_rs232_power_module_set_light(request->id, request->led_brightness);
-		bResult = true;
-		response->command_result = bResult;
+		const int ret = dssp_rs232_power_module_set_light(request->id, request->led_brightness);
+		// 보드가 실패를 돌려주면 그대로 알린다. 예전에는 항상 성공으로 답해 API 가 0 값을 실제 측정값으로 저장했다
+		response->command_result = (ret == 0);
 		return true;
 	}
 
 	bool LED_Toggle_Command(const std::shared_ptr<interfaces::srv::LedToggleControl::Request> request, const std::shared_ptr<interfaces::srv::LedToggleControl::Response> response)
 	{
-		bool bResult = false;
-		dssp_rs232_power_module_set_light_toggle(
+		const int ret = dssp_rs232_power_module_set_light_toggle(
 			request->de_index, request->light_accel, request->led_high_brightness, request->light_decel, request->led_low_brightness);
-		bResult = true;
-		response->command_result = bResult;
+		// 보드가 실패를 돌려주면 그대로 알린다. 예전에는 항상 성공으로 답해 API 가 0 값을 실제 측정값으로 저장했다
+		response->command_result = (ret == 0);
 		return true;
 	}
 
 	bool Toggle_On_Command(const std::shared_ptr<interfaces::srv::ToggleOn::Request> request, const std::shared_ptr<interfaces::srv::ToggleOn::Response> response)
 	{
-		bool bResult = false;
-		dssp_rs232_power_module_toggle_on(request->id);
-		bResult = true;
-		response->command_result = bResult;
+		const int ret = dssp_rs232_power_module_toggle_on(request->id);
+		// 보드가 실패를 돌려주면 그대로 알린다. 예전에는 항상 성공으로 답해 API 가 0 값을 실제 측정값으로 저장했다
+		response->command_result = (ret == 0);
 		return true;
 	}
 
@@ -440,21 +438,19 @@ public:
 
 	bool Power_Set_Outport_Command(const std::shared_ptr<interfaces::srv::PowerSetOutport::Request> request, const std::shared_ptr<interfaces::srv::PowerSetOutport::Response> response)
 	{
-		bool bResult = false;
-		dssp_rs232_power_module_set_OutputPort(
+		const int ret = dssp_rs232_power_module_set_OutputPort(
 			request->output0, request->output1, request->output2, request->output3,
 			request->output4, request->output5, request->output6, request->output7);
-		bResult = true;
-		response->command_result = bResult;
+		// 보드가 실패를 돌려주면 그대로 알린다. 예전에는 항상 성공으로 답해 API 가 0 값을 실제 측정값으로 저장했다
+		response->command_result = (ret == 0);
 		return true;
 	}
 
 	bool Power_Set_Single_Outport_Command(const std::shared_ptr<interfaces::srv::PowerSetSingleOutport::Request> request, const std::shared_ptr<interfaces::srv::PowerSetSingleOutport::Response> response)
 	{
-		bool bResult = false;
-		dssp_rs232_power_module_set_Single_OutputPort(request->id, request->value);
-		bResult = true;
-		response->command_result = bResult;
+		const int ret = dssp_rs232_power_module_set_Single_OutputPort(request->id, request->value);
+		// 보드가 실패를 돌려주면 그대로 알린다. 예전에는 항상 성공으로 답해 API 가 0 값을 실제 측정값으로 저장했다
+		response->command_result = (ret == 0);
 		return true;
 	}
 
@@ -485,38 +481,34 @@ public:
 
 	bool Power_Set_Enable_Command(const std::shared_ptr<interfaces::srv::PowerSetEnable::Request> request, const std::shared_ptr<interfaces::srv::PowerSetEnable::Response> response)
 	{
-		bool bResult = false;
-		dssp_rs232_power_module_set_Enable(
+		const int ret = dssp_rs232_power_module_set_Enable(
 			request->power0, request->power1, request->power2, request->power3,
 			request->power4, request->power5, request->power6, request->power7);
-		bResult = true;
-		response->command_result = bResult;
+		// 보드가 실패를 돌려주면 그대로 알린다. 예전에는 항상 성공으로 답해 API 가 0 값을 실제 측정값으로 저장했다
+		response->command_result = (ret == 0);
 		return true;
 	}
 
 	bool Power_Set_Single_Enable_Command(const std::shared_ptr<interfaces::srv::PowerSetSingleEnable::Request> request, const std::shared_ptr<interfaces::srv::PowerSetSingleEnable::Response> response)
 	{
-		bool bResult = false;
-		dssp_rs232_power_module_set_Single_Enable(request->id, request->value);
-		bResult = true;
-		response->command_result = bResult;
+		const int ret = dssp_rs232_power_module_set_Single_Enable(request->id, request->value);
+		// 보드가 실패를 돌려주면 그대로 알린다. 예전에는 항상 성공으로 답해 API 가 0 값을 실제 측정값으로 저장했다
+		response->command_result = (ret == 0);
 		return true;
 	}
 
 	bool Power_Wheel_Enable_Command(const std::shared_ptr<interfaces::srv::PowerWheelEnable::Request> request, const std::shared_ptr<interfaces::srv::PowerWheelEnable::Response> response)
 	{
-		bool bResult = false;
-		dssp_rs232_power_module_wheel_enable(request->on);
-		bResult = true;
-		response->command_result = bResult;
+		const int ret = dssp_rs232_power_module_wheel_enable(request->on);
+		// 보드가 실패를 돌려주면 그대로 알린다. 예전에는 항상 성공으로 답해 API 가 0 값을 실제 측정값으로 저장했다
+		response->command_result = (ret == 0);
 		return true;
 	}
 
 	bool Power_Paramter_Read_Command(const std::shared_ptr<interfaces::srv::PowerParameterRead::Request> request, const std::shared_ptr<interfaces::srv::PowerParameterRead::Response> response)
 	{
 		(void)request;
-		bool bResult = false;
-		dssp_rs232_power_module_parameter_read(
+		const int ret = dssp_rs232_power_module_parameter_read(
 			&m_iParam0,&m_iParam1,&m_iParam2,&m_iParam3,&m_iParam4,&m_iParam5,&m_iParam6,&m_iParam7,&m_iParam8,&m_iParam9,&m_iParam10,
 			&m_iParam11,&m_iParam12,&m_iParam13,&m_iParam14,&m_iParam15,&m_iParam16,&m_iParam17,&m_iParam18,&m_iParam19,&m_iParam20,
 			&m_iParam21,&m_iParam22,&m_iParam23,&m_iParam24,&m_iParam25,&m_iParam26,&m_iParam27,&m_iParam28,&m_iParam29,&m_iParam30,&m_iParam31);
@@ -554,25 +546,23 @@ public:
 		response->p30_conveyor_terminal_base = m_iParam30;
 		response->p31_conveyor_terminal_offset = m_iParam31;
 	
-		bResult = true;
-		response->command_result = bResult;
+		// 보드가 실패를 돌려주면 그대로 알린다. 예전에는 항상 성공으로 답해 API 가 0 값을 실제 측정값으로 저장했다
+		response->command_result = (ret == 0);
 		return true;
 	}
 
 	bool Power_Paramter_Write_Command(const std::shared_ptr<interfaces::srv::PowerParameterWrite::Request> request, const std::shared_ptr<interfaces::srv::PowerParameterWrite::Response> response)
 	{
-		bool bResult = false;
-		dssp_rs232_power_module_parameter_write(request->num, request->data);
-		bResult = true;
-		response->command_result = bResult;
+		const int ret = dssp_rs232_power_module_parameter_write(request->num, request->data);
+		// 보드가 실패를 돌려주면 그대로 알린다. 예전에는 항상 성공으로 답해 API 가 0 값을 실제 측정값으로 저장했다
+		response->command_result = (ret == 0);
 		return true;
 	}
 
 	bool Power_Data_Read_Command(const std::shared_ptr<interfaces::srv::PowerDataRead::Request> request, const std::shared_ptr<interfaces::srv::PowerDataRead::Response> response)
 	{
 		(void)request;
-		bool bResult = false;
-		dssp_rs232_power_module_data_read(
+		const int ret = dssp_rs232_power_module_data_read(
 			&m_iParam0,&m_iParam1,&m_iParam2,&m_iParam3,&m_iParam4,&m_iParam5,&m_iParam6,&m_iParam7,&m_iParam8,&m_iParam9,&m_iParam10,&m_iParam11);
 
 		response->d0_battery_voltage = m_iParam0;
@@ -588,16 +578,15 @@ public:
 		response->d10_mobd_inport_status = m_iParam10;
 		response->d11_mobd_outport_status = m_iParam11;
 
-		bResult = true;
-		response->command_result = bResult;
+		// 보드가 실패를 돌려주면 그대로 알린다. 예전에는 항상 성공으로 답해 API 가 0 값을 실제 측정값으로 저장했다
+		response->command_result = (ret == 0);
 		return true;
 	}
 
 	bool Power_ADC_Read_Command(const std::shared_ptr<interfaces::srv::PowerAdcRead::Request> request, const std::shared_ptr<interfaces::srv::PowerAdcRead::Response> response)
 	{
 		(void)request;
-		bool bResult = false;
-		dssp_rs232_power_module_adc_read(
+		const int ret = dssp_rs232_power_module_adc_read(
 			&m_iParam0,&m_iParam1,&m_iParam2,&m_iParam3,&m_iParam4,&m_iParam5,&m_iParam6,&m_iParam7);
 
 		response->d0_adc0 = m_iParam0;
@@ -609,8 +598,8 @@ public:
 		response->d6_adc6 = m_iParam6;
 		response->d7_adc7 = m_iParam7;
 
-		bResult = true;
-		response->command_result = bResult;
+		// 보드가 실패를 돌려주면 그대로 알린다. 예전에는 항상 성공으로 답해 API 가 0 값을 실제 측정값으로 저장했다
+		response->command_result = (ret == 0);
 		return true;
 	}
 
@@ -635,19 +624,17 @@ public:
 
 	bool Conveyor_Auto_Movement_Command(const std::shared_ptr<interfaces::srv::ConveyorAutoMovement::Request> request, const std::shared_ptr<interfaces::srv::ConveyorAutoMovement::Response> response)
 	{
-		bool bResult = false;
-		dssp_rs232_power_module_conveyor_movement(request->start);
-		bResult = true;
-		response->command_result = bResult;
+		const int ret = dssp_rs232_power_module_conveyor_movement(request->start);
+		// 보드가 실패를 돌려주면 그대로 알린다. 예전에는 항상 성공으로 답해 API 가 0 값을 실제 측정값으로 저장했다
+		response->command_result = (ret == 0);
 		return true;
 	}
 
 	bool Conveyor_Manual_Movement_Command(const std::shared_ptr<interfaces::srv::ConveyorManualMovement::Request> request, const std::shared_ptr<interfaces::srv::ConveyorManualMovement::Response> response)
 	{
-		bool bResult = false;
-		dssp_rs232_power_module_conveyor_manual_movement(request->mode);
-		bResult = true;
-		response->command_result = bResult;
+		const int ret = dssp_rs232_power_module_conveyor_manual_movement(request->mode);
+		// 보드가 실패를 돌려주면 그대로 알린다. 예전에는 항상 성공으로 답해 API 가 0 값을 실제 측정값으로 저장했다
+		response->command_result = (ret == 0);
 		return true;
 	}
 
@@ -687,18 +674,16 @@ public:
 
 	bool Conveyor_Parameter_Write_Command(const std::shared_ptr<interfaces::srv::ConveyorParameterWrite::Request> request, const std::shared_ptr<interfaces::srv::ConveyorParameterWrite::Response> response)
 	{
-		bool bResult = false;
-		dssp_rs232_conveyor_module_parameter_write(request->num, request->data);
-		bResult = true;
-		response->command_result = bResult;
+		const int ret = dssp_rs232_conveyor_module_parameter_write(request->num, request->data);
+		// 보드가 실패를 돌려주면 그대로 알린다. 예전에는 항상 성공으로 답해 API 가 0 값을 실제 측정값으로 저장했다
+		response->command_result = (ret == 0);
 		return true;
 	}
 
 	bool Conveyor_Data_Read_Command(const std::shared_ptr<interfaces::srv::ConveyorDataRead::Request> request, const std::shared_ptr<interfaces::srv::ConveyorDataRead::Response> response)
 	{
 		(void)request;
-		bool bResult = false;
-		dssp_rs232_conveyor_module_data_read(
+		const int ret = dssp_rs232_conveyor_module_data_read(
 			&m_iParam0,&m_iParam1,&m_iParam2,&m_iParam3,&m_iParam4,&m_iParam5,&m_iParam6,
 			&m_iParam7,&m_iParam8,&m_iParam9,&m_iParam10,&m_iParam11,&m_iParam12,&m_iParam13);
 	
@@ -717,16 +702,15 @@ public:
 		response->d12_photo_status = m_iParam12;
 		response->d13_conveyor_status = m_iParam13;
 	
-		bResult = true;
-		response->command_result = bResult;
+		// 보드가 실패를 돌려주면 그대로 알린다. 예전에는 항상 성공으로 답해 API 가 0 값을 실제 측정값으로 저장했다
+		response->command_result = (ret == 0);
 		return true;
 	}
 
 	bool Power_Sonar_Read_Command(const std::shared_ptr<interfaces::srv::PowerSonarRead::Request> request, const std::shared_ptr<interfaces::srv::PowerSonarRead::Response> response)
 	{
 		(void)request;
-		bool bResult = false;
-		dssp_rs232_power_module_sonar_read(&m_iParam0,&m_iParam1,&m_iParam2,&m_iParam3,&m_iParam4,&m_iParam5);
+		const int ret = dssp_rs232_power_module_sonar_read(&m_iParam0,&m_iParam1,&m_iParam2,&m_iParam3,&m_iParam4,&m_iParam5);
 
 		response->d0_sonar0 = m_iParam0;
 		response->d1_sonar1 = m_iParam1;
@@ -735,17 +719,16 @@ public:
 		response->d4_sonar4 = m_iParam4;
 		response->d5_sonar5 = m_iParam5;
 		
-		bResult = true;
-		response->command_result = bResult;
+		// 보드가 실패를 돌려주면 그대로 알린다. 예전에는 항상 성공으로 답해 API 가 0 값을 실제 측정값으로 저장했다
+		response->command_result = (ret == 0);
 		return true;
 	}
 
 	bool Power_Sonar_Command(const std::shared_ptr<interfaces::srv::PowerSonarCmd::Request> request, const std::shared_ptr<interfaces::srv::PowerSonarCmd::Response> response)
 	{
-		bool bResult = false;
-		dssp_rs232_power_module_set_Ultrasonic(request->start);
-		bResult = true;
-		response->command_result = bResult;
+		const int ret = dssp_rs232_power_module_set_Ultrasonic(request->start);
+		// 보드가 실패를 돌려주면 그대로 알린다. 예전에는 항상 성공으로 답해 API 가 0 값을 실제 측정값으로 저장했다
+		response->command_result = (ret == 0);
 		return true;
 	}
 
@@ -774,6 +757,21 @@ private:
 	rclcpp::Service<interfaces::srv::PowerSonarCmd>::SharedPtr power_sonar_cmd_srv;
 };
 
+// 전원 보드를 이만큼 연속으로 읽지 못하면 끊긴 것으로 본다 (한 번 읽는 데 최대 0.2초라 약 0.7초).
+// 예전에는 10번 넘게 실패해야(약 2.5초) 서보를 껐다
+constexpr int kPowerReadFailuresBeforeStop = 3;
+// 구동 드라이버(power_statusCallback)가 이 값을 받으면 서보를 끈다
+constexpr int kPowerBoardNoResponse = -10;
+constexpr double kReconnectIntervalSec = 2.0;
+
+// 포트를 연 직후와 다시 연 뒤에 보드에 보내는 초기 명령
+static void InitPowerBoard()
+{
+	// Charge port Enable
+	dssp_rs232_power_module_set_charging_ready(1);
+	if(m_bUltrasonic_option) dssp_rs232_power_module_set_Ultrasonic(1);
+}
+
 int main(int argc, char * argv[])
 {
 	rclcpp::init(argc, argv);
@@ -799,11 +797,8 @@ int main(int argc, char * argv[])
 		return -1;
 	}
 
-	// Charge port Enable
-	dssp_rs232_power_module_set_charging_ready(1);
-
-	// init
-	if(m_bUltrasonic_option) dssp_rs232_power_module_set_Ultrasonic(1);
+	InitPowerBoard();
+	auto last_reconnect_attempt = std::chrono::steady_clock::now();
 
 	printf("=========================================\n");
 	printf(" TETRA Power Driver Node Started (Port: %s)\n", port);
@@ -820,24 +815,43 @@ int main(int argc, char * argv[])
 		m_iPowerCheck = dssp_rs232_power_module_read_tetra(&m_dbattery, &m_dVoltage, &m_dCurrent, &m_imode_status, m_iInput, m_iOutput, m_dUltrasonic);
 		if(m_iPowerCheck < 0)
 		{
-			printf("!!!! Power Board data read Error(m_iPowerCheck: %d) !!!! \n", m_iPowerCheck);
-			if(m_iFlag_PowerCheck_cnt > 10)
+			m_iFlag_PowerCheck_cnt++;
+			if(m_iFlag_PowerCheck_cnt == 1)
 			{
+				printf("!!!! Power Board data read Error(m_iPowerCheck: %d) !!!! \n", m_iPowerCheck);
+			}
+			if(m_iFlag_PowerCheck_cnt == kPowerReadFailuresBeforeStop)
+			{
+				// 한 번만 알리고 파일로 남긴다. 예전에는 끊겨 있는 동안 매 주기 로그 파일을 새로 만들었다
 				printf("[Error]: Power Board Disconnect !!! \n");
 				Error_Log_write("Power Board Disconnect !!!");
+				// 예전에는 실패하면 continue 로 넘어가 이 코드를 발행하지 않아, 구동 드라이버의 전원 에러 정지가 동작하지 않았다
+				std_msgs::msg::Int32 power_status;
+				power_status.data = kPowerBoardNoResponse;
+				node->power_status_publisher->publish(power_status);
+			}
+			if(m_iFlag_PowerCheck_cnt >= kPowerReadFailuresBeforeStop)
+			{
 				std_msgs::msg::Int32 servo;
 				servo.data = 2;
 				node->servo_publisher->publish(servo);
-			}
-			else
-			{
-				m_iFlag_PowerCheck_cnt++;
+
+				// USB 를 뺐다 꽂으면 예전 fd 로는 계속 실패하므로 포트를 새로 연다
+				if(std::chrono::duration<double>(std::chrono::steady_clock::now() - last_reconnect_attempt).count() >= kReconnectIntervalSec)
+				{
+					last_reconnect_attempt = std::chrono::steady_clock::now();
+					if(dssp_rs232_power_module_create(port, 200) == 0) InitPowerBoard();
+				}
 			}
 			loop_rate.sleep();
 			continue;
 		}
 		else
 		{
+			if(m_iFlag_PowerCheck_cnt >= kPowerReadFailuresBeforeStop)
+			{
+				printf("Power Board connection restored\n");
+			}
 			m_iFlag_PowerCheck_cnt = 0;
 		}
 
@@ -943,15 +957,20 @@ int main(int argc, char * argv[])
 		// Conveyor Option Check
 		if(m_bConveyor_option)
 		{
+			// 읽지 못한 값을 내보내면 API 가 적재 상태를 0(빈 상태)으로 바꾼다
 			std_msgs::msg::Int32 conveyor_sensor;
-			dssp_rs232_power_module_read_conveyor_sensor(&m_dConveyor_sensor);
-			conveyor_sensor.data = m_dConveyor_sensor;
-			node->conveyor_sensor_publisher->publish(conveyor_sensor);
+			if(dssp_rs232_power_module_read_conveyor_sensor(&m_dConveyor_sensor) == 0)
+			{
+				conveyor_sensor.data = m_dConveyor_sensor;
+				node->conveyor_sensor_publisher->publish(conveyor_sensor);
+			}
 
 			std_msgs::msg::Int32 conveyor_movement;
-			dssp_rs232_power_module_read_conveyor_movement(&m_iConveyor_movement);
-			conveyor_movement.data = m_iConveyor_movement;
-			node->conveyor_movement_publisher->publish(conveyor_movement);
+			if(dssp_rs232_power_module_read_conveyor_movement(&m_iConveyor_movement) == 0)
+			{
+				conveyor_movement.data = m_iConveyor_movement;
+				node->conveyor_movement_publisher->publish(conveyor_movement);
+			}
 		}
 		
 		loop_rate.sleep();

@@ -13,6 +13,7 @@
 - tf2
 - tf2_ros
 - interfaces
+- tetra_serial (같은 레포의 RS232 공용 패키지)
 
 ## 설치 및 빌드 방법
 1. 워크스페이스 루트에서 다음 명령어를 실행합니다:
@@ -21,9 +22,7 @@
    ```
 
 ## 주요 파일 설명
-### include/
-- **`rs232_common.h`**: RS232 통신의 공통 헤더 파일.
-- **`rs232.h`**: RS232 통신 관련 함수 정의.
+RS232 포트 설정과 패킷 읽기·쓰기는 `tetra_serial` 패키지(`tetra_serial/rs232*.h`)를 씁니다.
 
 ### src/
 - **`drive_module.c`**: 로봇의 구동 모듈 구현.
@@ -36,6 +35,29 @@
 ### launch/
 - **`tetra_wheel_driver_launch.xml`**: XML 형식의 Launch 파일.
 - **`tetra_wheel_driver.launch.py`**: Python 형식의 Launch 파일로, ROS2 노드를 실행합니다.
+
+## 파라미터
+
+| 이름 | 기본값 | 설명 |
+|---|---|---|
+| `port` | `/dev/ttyS0` | 구동 보드 시리얼 포트 |
+| `robot_model` | `m` | 바퀴 반지름·간격을 고른다 (`m`, `h`, `edu`, `mh`, `s`, `sm`). **bringup 에서 꼭 넘겨야 합니다** |
+| `wheel_radius`, `wheel_distance`, `tread_width` | 0 (모델 값 사용) | 0 보다 크면 모델 값 대신 사용 |
+| `m_bEKF_option` | `false` | `true` 면 odom→base_footprint TF 를 내보내지 않음 (EKF 가 담당) |
+| `cmd_vel_timeout` | 0.5 | 이 시간(초) 동안 속도 명령이 없으면 정지. 0 이하면 끔 |
+| `max_linear_velocity` | 2.0 | 선속도 상한 (m/s) |
+| `max_angular_velocity` | 2.0 | 각속도 상한 (rad/s) |
+
+## 안전 동작
+- **모터 드라이버 에러**: 비상정지('1')·저전압('5')은 1초마다 리셋을 시도합니다. 그 밖의 에러(과부하, 엔코더 등)는 1초 간격으로 3번까지만
+  리셋·서보 ON 을 시도하고, 그래도 남으면 서보를 끈 채 멈춥니다. `/servo_on` 1 또는 `servo_cmd` 1 로 다시 켜면 해제됩니다.
+- **통신 끊김**: 구동 보드를 연속 15번(약 0.5초) 읽지 못하면 `/odom` 발행을 멈추고 2초마다 포트를 다시 엽니다.
+- **전원 보드 끊김**: `tetra_power_driver` 가 `/power_status` 에 -10 을 보내면 서보를 끕니다.
+- **종료**: 0 속도를 보낸 뒤 서보를 끕니다 (예외로 끝나도 같음).
+- `/odom` 의 twist 는 `base_footprint` 기준입니다 (EKF 가 vx·vy 를 로봇 기준으로 받음).
+
+## 하드웨어 없이 확인
+`tools/board_sim/` 의 가상 구동 보드로 노드를 실제로 띄워 볼 수 있습니다 (레포 루트 `tools/board_sim/README.md`).
 
 ## 주요 토픽 및 서비스
 ### 퍼블리시 토픽

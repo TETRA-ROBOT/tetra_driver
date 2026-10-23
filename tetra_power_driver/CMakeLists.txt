@@ -23,10 +23,9 @@ find_package(std_srvs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(interfaces REQUIRED)
+find_package(tetra_serial REQUIRED)
 
 include_directories(
-  ${PROJECT_SOURCE_DIR}
-  ${PROJECT_SOURCE_DIR}/include
   ${PROJECT_SOURCE_DIR}/src
   ${rclcpp_INCLUDE_DIRS}
   ${std_msgs_INCLUDE_DIRS}
@@ -37,8 +36,6 @@ include_directories(
 )
 
 add_executable(tetra_power_driver
-  include/rs232.c
-  include/rs232_common.c
   src/power_module.c
   src/dssp_rs232_power_module.c
   src/tetra_power_driver.cpp
@@ -54,6 +51,7 @@ set(dependencies
 )
 
 ament_target_dependencies(tetra_power_driver ${dependencies})
+target_link_libraries(tetra_power_driver tetra_serial::tetra_serial)
 
 install(TARGETS 
   tetra_power_driver

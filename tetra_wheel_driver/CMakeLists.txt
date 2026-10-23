@@ -27,10 +27,9 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(interfaces REQUIRED)
+find_package(tetra_serial REQUIRED)
 
 include_directories(
-  ${PROJECT_SOURCE_DIR}
-  ${PROJECT_SOURCE_DIR}/include
   ${PROJECT_SOURCE_DIR}/src
   ${rclcpp_INCLUDE_DIRS}
   ${std_msgs_INCLUDE_DIRS}
@@ -45,8 +44,6 @@ include_directories(
 
 add_executable(tetra_wheel_driver
   src/tetra_wheel_driver.cpp
-  include/rs232.c
-  include/rs232_common.c
   src/drive_module.c
   src/dssp_rs232_drive_module.c
 )
@@ -65,6 +62,7 @@ set(dependencies
 )
 
 ament_target_dependencies(tetra_wheel_driver ${dependencies})
+target_link_libraries(tetra_wheel_driver tetra_serial::tetra_serial)
 
 install(TARGETS 
   tetra_wheel_driver

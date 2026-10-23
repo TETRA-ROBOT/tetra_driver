@@ -4,8 +4,9 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <termios.h>
+#include <sys/ioctl.h>
 
-#include "rs232.h"
+#include "tetra_serial/rs232.h"
 
 int open_port(const char *device)
 {
@@ -14,11 +15,17 @@ int open_port(const char *device)
 	fd = open(device, O_RDWR | O_NOCTTY | O_NDELAY);
 	if(fd == -1) {
 		perror("open_port : Unable to open port");
+		return -1;
 	}
-	else {
-		fcntl(fd, F_SETFL, 0);
+	fcntl(fd, F_SETFL, 0);
+
+	// 다른 노드가 같은 포트를 열어 패킷이 섞이는 일을 막는다 (설정 실수로 두 드라이버가 한 포트를 가리킬 때)
+	// 잠금을 지원하지 않는 장치도 있으므로 실패해도 포트는 계속 쓴다
+	if(ioctl(fd, TIOCEXCL) == -1) {
+		perror("open_port : Unable to lock port (continuing)");
 	}
-	
+	tcflush(fd, TCIOFLUSH);
+
 	return fd;
 }
 
@@ -31,8 +38,11 @@ int set_terminal(int fd, int baudrate, int time)
 {
 	struct termios term;
 
-	tcgetattr(fd, &term);
-	bzero(&term, sizeof(term));
+	if(tcgetattr(fd, &term) == -1) {
+		perror("set_terminal : tcgetattr");
+		return -1;
+	}
+	memset(&term, 0, sizeof(term));
 
 	//  set baud rate
 	switch(baudrate)
@@ -109,7 +119,10 @@ int set_terminal(int fd, int baudrate, int time)
 	term.c_cc[VMIN] = 0;
 	term.c_cc[VTIME] = time;
 	
-	tcsetattr(fd, TCSANOW, &term);
+	if(tcsetattr(fd, TCSANOW, &term) == -1) {
+		perror("set_terminal : tcsetattr");
+		return -1;
+	}
 
 	return 0;
 }
