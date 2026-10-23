@@ -32,3 +32,4 @@
    - 선속도: `m/s`, 각속도: `rad/s`
    - 배터리: 퍼센트(`%`, 0~100)
    - 전압: `V`, 전류: `A`
+3. **`tetra_wheel_driver/src/legacy_archive/`, `tetra_power_driver/src/legacy_archive/`는 빌드(CMakeLists)에서 쓰지 않습니다.** 예전 모델별 코드 참고용이니 수정 대상이 아닙니다.
