@@ -34,6 +34,8 @@ node = rclpy.create_node('wheel_driver_test')
 odoms = []
 node.create_subscription(Odometry, 'odom', lambda m: odoms.append((time.monotonic(), m)), 50)
 cmd = node.create_publisher(Twist, 'cmd_vel_manual', 10)
+nav_final_cmd = node.create_publisher(Twist, 'cmd_vel_nav2', 10)
+nav_raw_cmd = node.create_publisher(Twist, 'cmd_vel_nav', 10)
 servo_on = node.create_publisher(Int32, 'servo_on', 10)
 
 
@@ -45,13 +47,18 @@ def spin_for(seconds, publish=None):
         rclpy.spin_once(node, timeout_sec=0.03)
 
 
-def send(linear, angular):
+def send(linear, angular, publisher=None):
     def publish():
         msg = Twist()
         msg.linear.x = linear
         msg.angular.z = angular
-        cmd.publish(msg)
+        (publisher or cmd).publish(msg)
     return publish
+
+
+def wheels_moving():
+    with board.lock:
+        return board.left_mm_s != 0 or board.right_mm_s != 0
 
 
 spin_for(3.0)
@@ -127,6 +134,16 @@ with board.lock:
 spin_for(4.0)
 check('no stale odometry while board is silent', silent == 0, f'({silent} msgs while silent)')
 check('odometry resumes after reconnect', len(odoms) - mark - silent > 20, f'({len(odoms) - mark - silent} msgs)')
+
+# 9. Nav2 final output (collision_monitor -> cmd_vel_nav2) drives the wheels
+spin_for(1.5)
+spin_for(2.0, send(0.2, 0.0, nav_final_cmd))
+check('drives on cmd_vel_nav2', wheels_moving())
+spin_for(1.5)
+
+# 10. raw controller output (before smoother/collision_monitor) is ignored by default
+spin_for(2.0, send(0.2, 0.0, nav_raw_cmd))
+check('ignores raw cmd_vel_nav (use_raw_nav_cmd=false)', not wheels_moving())
 
 # 8. shutdown: zero velocity before servo off
 spin_for(1.0, send(0.2, 0.0))

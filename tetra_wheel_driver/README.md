@@ -28,7 +28,7 @@ RS232 포트 설정과 패킷 읽기·쓰기는 `tetra_serial` 패키지(`tetra_
 - **`drive_module.c`**: 로봇의 구동 모듈 구현.
 - **`dssp_rs232_drive_module.c`**: RS232 기반 구동 모듈 구현.
 - **`tetra_wheel_driver.cpp`**: ROS2 노드의 메인 파일로, 로봇의 주행 동작을 제어합니다. 주요 기능:
-  - `/cmd_vel_nav`, `/cmd_vel_manual` 토픽을 구독하여 로봇의 속도를 제어.
+  - `/cmd_vel_nav2`(Nav2 최종 출력), `/cmd_vel_manual`(웹 조그) 토픽을 구독하여 로봇의 속도를 제어.
   - `/odom` 토픽을 퍼블리시하여 로봇의 위치와 자세 정보를 제공합니다.
   - 다양한 서비스(`ParameterRead`, `ParameterWrite`, `SetMoveMode` 등)를 통해 로봇의 설정 및 동작을 제어.
 
@@ -68,8 +68,10 @@ RS232 포트 설정과 패킷 읽기·쓰기는 `tetra_serial` 패키지(`tetra_
 - **`/right_error_code`** (타입: `std_msgs/msg/Int32`): 오른쪽 모터의 오류 코드를 퍼블리시합니다.
 
 ### 구독 토픽
-- **`/cmd_vel_nav`** (타입: `geometry_msgs/msg/Twist`): 내비게이션 명령을 수신하여 로봇의 속도를 제어합니다.
-- **`/cmd_vel_nav2`** (타입: `geometry_msgs/msg/Twist`): 보조 내비게이션 명령을 수신합니다.
+- **`/cmd_vel_nav2`** (타입: `geometry_msgs/msg/Twist`): Nav2 최종 명령. `cmd_vel_nav → velocity_smoother → collision_monitor` 를 거친 값이고, 도킹(docking_server)도 이 토픽으로 보냅니다.
+- **`/cmd_vel_nav`** (타입: `geometry_msgs/msg/Twist`): 기본은 **구독하지 않습니다** (`use_raw_nav_cmd:=false`).
+  평활화·충돌 감시 전의 컨트롤러 원본이라, 받으면 collision_monitor 가 0(정지)을 보낸 직후 원본 명령으로 다시 움직입니다.
+  예전 동작(cmd_vel_nav2 가 0 이면 cmd_vel_nav 사용)으로 되돌릴 때만 `use_raw_nav_cmd:=true` 로 켭니다.
 - **`/cmd_vel_manual`** (타입: `geometry_msgs/msg/Twist`): 수동 속도 명령을 수신합니다.
 - **`/accel_vel`** (타입: `std_msgs/msg/Int32`): 가속도 데이터를 수신합니다.
 - **`/pose_reset`** (타입: `std_msgs/msg/Int32`): 로봇의 위치를 초기화합니다.
@@ -90,9 +92,9 @@ RS232 포트 설정과 패킷 읽기·쓰기는 `tetra_serial` 패키지(`tetra_
    ```bash
    ros2 launch tetra_wheel_driver tetra_wheel_driver.launch.py
    ```
-2. `/cmd_vel_nav` 토픽을 퍼블리시하여 로봇의 속도를 제어합니다:
+2. `/cmd_vel_manual` 토픽을 퍼블리시하여 로봇의 속도를 제어합니다 (0.5초 이상 끊기면 멈춤):
    ```bash
-   ros2 topic pub /cmd_vel_nav geometry_msgs/msg/Twist "{linear: {x: 0.5, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.1}}"
+   ros2 topic pub -r 10 /cmd_vel_manual geometry_msgs/msg/Twist "{linear: {x: 0.5, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.1}}"
    ```
 3. `param_read_cmd` 서비스를 호출하여 매개변수를 읽습니다:
    ```bash

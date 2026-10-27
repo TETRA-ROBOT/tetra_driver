@@ -7,7 +7,7 @@
 |---|---|
 | `fake_drive_board.py` | 가상 구동 보드. 속도 명령을 받아 위치를 적분하고, 에러 코드·무응답을 흉내 낼 수 있음 |
 | `fake_power_board.py` | 가상 전원 보드. 배터리·데이터 읽기와 ASCII 명령에 응답, 무응답을 흉내 낼 수 있음 |
-| `test_wheel_driver.py` | 바퀴 드라이버 시나리오 12개 (아래) |
+| `test_wheel_driver.py` | 바퀴 드라이버 시나리오 14개 (아래) |
 | `test_power_driver.py` | 전원 드라이버 시나리오 8개 (아래) |
 
 ## 실행
@@ -27,7 +27,7 @@ python3 -P <tetra_driver>/tools/board_sim/test_power_driver.py
 
 ## 확인하는 것
 
-바퀴 드라이버: 시작 시 오도메트리 발행, 90° 방향 직진 시 twist 가 로봇 기준(vx≈v, vy≈0), 속도 명령이 끊기면 정지,
+바퀴 드라이버: 시작 시 오도메트리 발행, 90° 방향 직진 시 twist 가 로봇 기준(vx≈v, vy≈0), 속도 명령이 끊기면 정지, cmd_vel_nav2 로 주행하고 cmd_vel_nav 원본은 무시,
 속도 상한(2 m/s), 359°→0° 회전 시 각속도 튐 없음, 과부하가 계속되면 1초 간격으로 3번만 다시 켜고 서보 OFF 로 멈춤,
 `/servo_on` 1 로 해제, 보드 무응답 동안 오도메트리 발행 중단과 재연결, 종료 시 0 속도 → 서보 OFF.
 

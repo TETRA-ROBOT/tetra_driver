@@ -252,6 +252,10 @@ public:
 		// 조이스틱 누적값이나 잘못된 명령이 보드 한계(약 32 m/s)까지 그대로 가는 것만 막는다
 		this->declare_parameter("max_linear_velocity", 2.0);
 		this->declare_parameter("max_angular_velocity", 2.0);
+		// Nav2 명령은 cmd_vel_nav → velocity_smoother → collision_monitor → cmd_vel_nav2 로 온다.
+		// cmd_vel_nav 를 직접 받으면 collision_monitor 가 0(정지)을 보낸 직후 원본 명령으로 다시 움직이므로 기본은 받지 않는다.
+		// true 는 예전 동작(cmd_vel_nav2 가 없을 때 cmd_vel_nav 사용)으로 되돌릴 때만 쓴다
+		this->declare_parameter("use_raw_nav_cmd", false);
 
 		// Get parameters
 		std::string robot_model = this->get_parameter("robot_model").as_string();
@@ -259,6 +263,7 @@ public:
 		strncpy(port, port_str.c_str(), sizeof(port) - 1);
 		m_bEKF_option = this->get_parameter("m_bEKF_option").as_bool();
 		m_dCmdVelTimeout = this->get_parameter("cmd_vel_timeout").as_double();
+		const bool use_raw_nav_cmd = this->get_parameter("use_raw_nav_cmd").as_bool();
 		m_dMaxLinearVelocity = std::fabs(this->get_parameter("max_linear_velocity").as_double());
 		m_dMaxAngularVelocity = std::fabs(this->get_parameter("max_angular_velocity").as_double());
 
@@ -326,7 +331,11 @@ public:
 
 		// subscribe list
 		joy_subscriber = this->create_subscription<sensor_msgs::msg::Joy>("joy", rclcpp::SensorDataQoS(), std::bind(&TETRAWheelDriver::joyCallback, this, _1));
-		cmd_vel_subscriber = this->create_subscription<geometry_msgs::msg::Twist>("cmd_vel_nav", rclcpp::SensorDataQoS(), std::bind(&TETRAWheelDriver::velCallback, this, _1));
+		if(use_raw_nav_cmd)
+		{
+			RCLCPP_WARN(this->get_logger(), "use_raw_nav_cmd=true: collision_monitor 를 거치지 않은 cmd_vel_nav 도 받습니다");
+			cmd_vel_subscriber = this->create_subscription<geometry_msgs::msg::Twist>("cmd_vel_nav", rclcpp::SensorDataQoS(), std::bind(&TETRAWheelDriver::velCallback, this, _1));
+		}
 		cmd_vel_subscriber2 = this->create_subscription<geometry_msgs::msg::Twist>("cmd_vel_nav2", rclcpp::SensorDataQoS(), std::bind(&TETRAWheelDriver::velCallback2, this, _1));
 		cmd_vel_manual_subscriber = this->create_subscription<geometry_msgs::msg::Twist>("cmd_vel_manual", rclcpp::SensorDataQoS(), std::bind(&TETRAWheelDriver::Manual_velCallback, this, _1));
 		acc_subscriber = this->create_subscription<std_msgs::msg::Int32>("accel_vel", 10, std::bind(&TETRAWheelDriver::accelCallback, this, _1));
