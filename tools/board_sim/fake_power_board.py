@@ -19,6 +19,8 @@ class FakePowerBoard:
         self.path = os.ttyname(slave)
         self._slave = slave
         self.responding = True
+        # Sonar 0..3 in mm (D_L, R_L, R_R, D_R). The real board reports its max distance (500) when nothing is detected
+        self.sonar_mm = [500, 500, 500, 500]
         self.log = []
         threading.Thread(target=self._run, daemon=True).start()
 
@@ -43,7 +45,8 @@ class FakePowerBoard:
             if not self.responding:
                 continue
             if cmd == 'PQ':
-                words = [85, 252, 15, 1, 0, 0, 500, 500, 500, 500]
+                # The status packet carries sonar 1, 2, 3 and then 0 (see power_read_tetra)
+                words = [85, 252, 15, 1, 0, 0] + self.sonar_mm[1:] + self.sonar_mm[:1]
                 self._binary(b''.join(w.to_bytes(2, 'big') for w in words))
             elif cmd == 'PD':
                 self._binary(b''.join(w.to_bytes(2, 'big') for w in [252] + [0] * 11))

@@ -7,6 +7,7 @@ import time
 
 import rclpy
 from interfaces.srv import LedControl, PowerDataRead
+from sensor_msgs.msg import PointCloud2, Range
 from std_msgs.msg import Int32
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -25,7 +26,7 @@ def check(name, ok, detail=''):
 board = FakePowerBoard()
 exe = os.path.join(WS, 'install/tetra_power_driver/lib/tetra_power_driver/tetra_power_driver')
 node_log = os.path.join(os.environ.get('LOG_DIR', '/tmp'), 'tetra_power_driver_test.log')
-proc = subprocess.Popen([exe, '--ros-args', '-p', f'port:={board.path}'],
+proc = subprocess.Popen([exe, '--ros-args', '-p', f'port:={board.path}', '-p', 'm_bUltrasonic_option:=true'],
                         stdout=open(node_log, 'w'), stderr=subprocess.STDOUT)
 
 rclpy.init()
@@ -34,6 +35,12 @@ battery, power_status, servo = [], [], []
 node.create_subscription(Int32, 'tetra_battery', lambda m: battery.append(m.data), 50)
 node.create_subscription(Int32, 'power_status', lambda m: power_status.append(m.data), 50)
 node.create_subscription(Int32, 'servo_on', lambda m: servo.append(m.data), 50)
+sonar_range, sonar_points = {}, {}
+for sonar_name, range_suffix in (('DL', 'D_L'), ('RL', 'R_L'), ('RR', 'R_R'), ('DR', 'D_R')):
+    node.create_subscription(Range, f'Ultrasonic_{range_suffix}',
+                             lambda m, k=sonar_name: sonar_range.__setitem__(k, m.range), 10)
+    node.create_subscription(PointCloud2, f'range_points_{sonar_name}',
+                             lambda m, k=sonar_name: sonar_points.__setitem__(k, m.width), 10)
 data_cli = node.create_client(PowerDataRead, 'Power_data_read_cmd')
 led_cli = node.create_client(LedControl, 'led_cmd')
 
@@ -62,6 +69,16 @@ check('data read reports success with board values', res.command_result and res.
 
 res = call(led_cli, LedControl.Request(id=1, led_brightness=50))
 check('ASCII command (LED) still reports success', res.command_result)
+
+# 보드는 감지가 없으면 최대 거리(500mm)를 보낸다. 그 값은 장애물 점이 되면 안 된다
+board.sonar_mm = [500, 346, 0, 499]
+spin_for(1.0)
+check('sonar at board max distance or 0 is not an obstacle point', sonar_points.get('DL') == 0 and sonar_points.get('RR') == 0,
+      f'(points={sonar_points})')
+check('sonar inside its range becomes one obstacle point', sonar_points.get('RL') == 1 and sonar_points.get('DR') == 1,
+      f'(points={sonar_points})')
+check('sonar range reports the measured distance, max when nothing is detected',
+      [round(sonar_range.get(k, -1), 3) for k in ('DL', 'RL', 'RR', 'DR')] == [0.5, 0.346, 0.5, 0.499], f'({sonar_range})')
 
 board.responding = False
 mark_status, mark_servo = len(power_status), len(servo)

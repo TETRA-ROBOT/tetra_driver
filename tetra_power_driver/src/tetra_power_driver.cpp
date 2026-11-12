@@ -61,7 +61,6 @@ extern "C" {
 #endif
 
 #define BUF_LEN 4096
-#define Ultrasonic_MAX_range 1.0
 #define Ultrasonic_MIN_range 0.04
 
 using namespace std;
@@ -117,6 +116,16 @@ int m_iPowerCheckCount = 0;
 
 // Ultrasonic data
 bool m_bUltrasonic_option = false;
+// 전원 보드는 감지가 없으면 0 이 아니라 자기 최대 거리(보드 파라미터 p5_sonar_max_distance, 기본 500mm)를 보낸다.
+// 이 값 이상을 장애물로 찍으면 센서마다 그 거리에 가짜 장애물이 항상 생긴다
+double m_dUltrasonicMaxRange = 0.5;
+
+// 감지가 없는 측정값(0 또는 최대 거리 이상)은 최대 거리로 맞춘다. RangeToCloud 는 최대 거리 미만만 점으로 만든다
+static double UltrasonicRangeOrMax(double measured_range)
+{
+	const bool nothing_detected = (measured_range <= 0.0 || measured_range >= m_dUltrasonicMaxRange);
+	return nothing_detected ? m_dUltrasonicMaxRange : measured_range;
+}
 double m_dUltrasonic[8] = {0.0, };
 sensor_msgs::msg::Range range_msg1;
 sensor_msgs::msg::Range range_msg2;
@@ -176,11 +185,13 @@ public:
 		this->declare_parameter("port", "/dev/ttyS1");
 		this->declare_parameter("m_bConveyor_option", false);
 		this->declare_parameter("m_bUltrasonic_option", false);
+		this->declare_parameter("ultrasonic_max_range", 0.5);
 
 		std::string port_param = this->get_parameter("port").as_string();
 		strncpy(port, port_param.c_str(), sizeof(port) - 1);
 		m_bConveyor_option = this->get_parameter("m_bConveyor_option").as_bool();
 		m_bUltrasonic_option = this->get_parameter("m_bUltrasonic_option").as_bool();
+		m_dUltrasonicMaxRange = this->get_parameter("ultrasonic_max_range").as_double();
 
 		// Publishers
 		power_status_publisher = this->create_publisher<std_msgs::msg::Int32>("power_status", 1);
@@ -334,7 +345,7 @@ public:
 		output.is_bigendian = false;
 		output.is_dense = true;
 
-		if (range_msg->range < Ultrasonic_MAX_range && range_msg->range > Ultrasonic_MIN_range)
+		if (range_msg->range < m_dUltrasonicMaxRange && range_msg->range > Ultrasonic_MIN_range)
 		{
 			output.width = 1;
 			sensor_msgs::PointCloud2Modifier modifier(output);
@@ -907,39 +918,39 @@ int main(int argc, char * argv[])
 		range_msg1.radiation_type = 0;
 		range_msg1.field_of_view = (60.0/180.0) * M_PI;
 		range_msg1.min_range = Ultrasonic_MIN_range; 
-		range_msg1.max_range = Ultrasonic_MAX_range; 
+		range_msg1.max_range = m_dUltrasonicMaxRange; 
 
 		char frameid2[] = "sonar_RL";
 		range_msg2.header.frame_id = frameid2;
 		range_msg2.radiation_type = 0;
 		range_msg2.field_of_view = (60.0/180.0) * M_PI;
 		range_msg2.min_range = Ultrasonic_MIN_range;
-		range_msg2.max_range = Ultrasonic_MAX_range;
+		range_msg2.max_range = m_dUltrasonicMaxRange;
 
 		char frameid3[] = "sonar_RR";
 		range_msg3.header.frame_id = frameid3;
 		range_msg3.radiation_type = 0;
 		range_msg3.field_of_view = (60.0/180.0) * M_PI;
 		range_msg3.min_range = Ultrasonic_MIN_range;
-		range_msg3.max_range = Ultrasonic_MAX_range;
+		range_msg3.max_range = m_dUltrasonicMaxRange;
 
 		char frameid4[] = "sonar_DR";
 		range_msg4.header.frame_id = frameid4;
 		range_msg4.radiation_type = 0;
 		range_msg4.field_of_view = (60.0/180.0) * M_PI;
 		range_msg4.min_range = Ultrasonic_MIN_range;
-		range_msg4.max_range = Ultrasonic_MAX_range;
+		range_msg4.max_range = m_dUltrasonicMaxRange;
 
-		range_msg1.range = (m_dUltrasonic[0] == 0.0) ? Ultrasonic_MAX_range : m_dUltrasonic[0];
+		range_msg1.range = UltrasonicRangeOrMax(m_dUltrasonic[0]);
 		range_msg1.header.stamp = node->current_time;
 
-		range_msg2.range = (m_dUltrasonic[1] == 0.0) ? Ultrasonic_MAX_range : m_dUltrasonic[1];
+		range_msg2.range = UltrasonicRangeOrMax(m_dUltrasonic[1]);
 		range_msg2.header.stamp = node->current_time;
 
-		range_msg3.range = (m_dUltrasonic[2] == 0.0) ? Ultrasonic_MAX_range : m_dUltrasonic[2];
+		range_msg3.range = UltrasonicRangeOrMax(m_dUltrasonic[2]);
 		range_msg3.header.stamp = node->current_time;
 
-		range_msg4.range = (m_dUltrasonic[3] == 0.0) ? Ultrasonic_MAX_range : m_dUltrasonic[3];
+		range_msg4.range = UltrasonicRangeOrMax(m_dUltrasonic[3]);
 		range_msg4.header.stamp = node->current_time;
 
 		if(m_bUltrasonic_option)

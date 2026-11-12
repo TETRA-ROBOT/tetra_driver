@@ -38,6 +38,7 @@ RS232 포트 설정과 패킷 읽기·쓰기는 `tetra_serial` 패키지(`tetra_
 | `port` | `/dev/ttyS1` | 전원 보드 시리얼 포트 |
 | `m_bConveyor_option` | `false` | 컨베이어 센서·동작 상태 발행 |
 | `m_bUltrasonic_option` | `false` | 초음파 센서 켜기·발행 |
+| `ultrasonic_max_range` | `0.5` | 초음파 최대 거리(m). 보드 파라미터 `p5_sonar_max_distance`(mm, `/Power_parameter_read_cmd`)와 맞춥니다 |
 
 ## 통신 오류 처리
 - 모든 서비스의 `command_result` 는 보드 응답 결과입니다. 응답이 없거나 깨지면 `false` 이고, 값은 쓰지 마세요.
@@ -82,6 +83,7 @@ RS232 포트 설정과 패킷 읽기·쓰기는 `tetra_serial` 패키지(`tetra_
 ### 초음파(Ultrasonic) 옵션
 - 초음파 센서를 통해 최대 8개의 거리 데이터를 수집할 수 있습니다.
 - 초음파 데이터는 `sensor_msgs/msg/Range` 메시지 형식으로 퍼블리시되거나 PointCloud2 데이터로 변환될 수 있습니다.
+- 보드는 감지가 없으면 최대 거리 값을 보냅니다. `ultrasonic_max_range` 이상(과 0)은 "감지 없음"으로 보고 `Range` 는 최대 거리로, `range_points_*` 는 빈 점군으로 발행합니다.
 
 ### 컨베이어(Conveyor) 옵션
 - 컨베이어 센서 상태와 이동 상태를 퍼블리시합니다.
