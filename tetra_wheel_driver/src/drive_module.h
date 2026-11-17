@@ -25,6 +25,7 @@ int drvm_read_odometry(int fd, double *Xpos_mm, double *Ypos_mm, double *deg);
 int drvm_set_Charge_On(int fd);
 int drvm_set_Charge_Off(int fd);
 int drvm_set_velocity2(int fd, int left, int right, double *x, double *y, double *theta, double *velocity_l, double *velocity_r, int *bumper, int *emg);
+int drvm_velocity2_frame_length(void);  /* 20: 지금 보드, 16: 구형 M 구동보드 */
 
 /* drvm_set_velocity2() 의 마지막 응답 분류.
  * 반환값(ret)은 정상 응답에서도 음수일 수 있어 보드 호환성 판별에 쓸 수 없으므로 별도로 노출한다. */

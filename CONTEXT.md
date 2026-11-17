@@ -38,3 +38,10 @@
 6. **안전 동작**(모터 에러 재시도 제한, 통신 끊김 시 정지·재연결, 종료 시 0 속도 → 서보 OFF)은 각 패키지 README 의 "안전 동작"/"통신 오류 처리"를 보세요. 바꾸면 아래 가상 보드 테스트로 확인합니다.
 7. **하드웨어 없이 확인**: `tools/board_sim/` 의 가상 구동·전원 보드에 실제 노드를 붙여 시나리오를 돌립니다 (`tools/board_sim/README.md`).
 8. **HerkuleX 서보(Pan/Tilt)는 이 레포에 없습니다.** `tetra_dependency/herkulex_driver` 를 씁니다 (`herkulex/set_angle` 등). 예전 `herkulex` 패키지는 쓰는 곳이 없어 지웠습니다.
+9. **구형 M 구동보드**는 velocity2('BV') 응답이 16바이트(속도 4바이트 없음)다. `drive_module.c` 가 짧은 프레임이 연속으로 오면 스스로 16바이트로 읽는다
+   (20바이트를 기다리면 매 주기 0.2초 타임아웃이 걸려 제어 루프가 5Hz 로 떨어지고 조그에서 손을 떼도 한참 더 간다).
+   이 보드는 비상정지 동안 주행 명령을 FLAG_FAIL(02 32 03)로 거부하므로, 비상정지 중의 FLAG_FAIL 은 `/drive_board_incompatible` 판정에 세지 않는다.
+10. **`emg_releases_servo`** (기본 false, `tetra_bringup_m.launch.py` 는 구형 M 일 때 true): 비상정지 버튼을 누르면 서보를 풀고, 풀리면 에러를 지우고 다시 켠다.
+    뒤쪽 서보 버튼이 없는 구형 M 용이다. **`publish_odom_covariance`** (기본 false, M 런치는 true): `/odom` 에 공분산을 싣는다. `ekf_m.yaml` 이 이 값에 맞춰져 있다
+    (주행 중 회전 분산 1e-6 으로 바퀴가 방향을 잡고 IMU 는 바퀴가 끊길 때 대신한다. 근거는 `FillOdometryCovariance` 주석).
+    구형 보드와 비상정지 동작은 `tools/board_sim/test_wheel_driver_legacy_m.py` 로 확인한다.
