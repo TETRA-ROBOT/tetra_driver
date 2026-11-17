@@ -917,10 +917,12 @@ static void InitDriveBoard()
 	usleep(10000);
 }
 
-// 공분산을 0 으로 두면 EKF 가 바퀴 값을 오차 없는 값으로 받아 IMU 를 사실상 쓰지 않는다 (바퀴가 미끄러져도 그대로 믿는다).
-// 바퀴는 직진 속도는 정확하고 회전은 미끄러짐 때문에 덜 정확하므로, 회전 쪽 분산을 IMU 자이로(약 1e-4)보다 크게 준다.
-// 그러면 평소 방향은 IMU 가 잡고, IMU 가 끊기면 바퀴 회전 속도로 이어 간다.
-// 바퀴가 서 있을 때는 로봇이 돌고 있지 않은 것이 확실하므로 회전 분산을 아주 작게 줘, 자이로 영점 오차로 방향이 흘러가지 않게 한다.
+// EKF(ekf_m.yaml)가 바퀴와 IMU 의 회전 속도를 섞을 때 쓰는 공분산.
+// 실측(2026-11-17 자동 탐사 5분, 누적 회전 2000°)에서 주행 중 바퀴 회전은 SLAM 대비 RMS 3.8° 로 정확했고,
+// iAHRS 자이로는 주행 진동으로 0.2~0.4°/s 흐르고 반시계 회전을 2.5% 적게 재 같은 구간에서 57° 틀어졌다.
+// 그래서 주행 중 회전 분산을 IMU(약 1e-4)보다 100배 작게 줘 방향은 바퀴가 잡고, 바퀴가 끊기면(발행 중단) IMU 로 이어 간다.
+// 바닥이 미끄러워 바퀴가 헛도는 현장에서는 이 값을 키워 IMU 비중을 올린다.
+// 바퀴가 서 있을 때는 로봇이 돌고 있지 않은 것이 확실하므로 더 작게 줘, 자이로 영점 오차로 방향이 흘러가지 않게 한다.
 // publish_odom_covariance 를 켠 모델만 쓴다 (EKF 설정이 이 값에 맞춰져 있어야 한다. tetra_bringup/params/ekf_m.yaml)
 static void FillOdometryCovariance(nav_msgs::msg::Odometry & odom)
 {
@@ -933,7 +935,7 @@ static void FillOdometryCovariance(nav_msgs::msg::Odometry & odom)
 	constexpr double kYawVariance = 3e-2;            // (rad)^2
 	constexpr double kLinearVelocityVariance = 1e-3; // (m/s)^2
 	constexpr double kLateralVelocityVariance = 1e-4; // 차동 구동은 옆으로 가지 않는다
-	constexpr double kYawRateVariance = 2e-2;        // (rad/s)^2
+	constexpr double kYawRateVariance = 1e-6;        // (rad/s)^2
 	constexpr double kUnusedVariance = 1e6;          // z, roll, pitch 는 재지 않는다
 
 	odom.pose.covariance.fill(0.0);

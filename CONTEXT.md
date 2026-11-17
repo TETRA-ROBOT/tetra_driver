@@ -42,5 +42,6 @@
    (20바이트를 기다리면 매 주기 0.2초 타임아웃이 걸려 제어 루프가 5Hz 로 떨어지고 조그에서 손을 떼도 한참 더 간다).
    이 보드는 비상정지 동안 주행 명령을 FLAG_FAIL(02 32 03)로 거부하므로, 비상정지 중의 FLAG_FAIL 은 `/drive_board_incompatible` 판정에 세지 않는다.
 10. **`emg_releases_servo`** (기본 false, `tetra_bringup_m.launch.py` 는 구형 M 일 때 true): 비상정지 버튼을 누르면 서보를 풀고, 풀리면 에러를 지우고 다시 켠다.
-    뒤쪽 서보 버튼이 없는 구형 M 용이다. **`publish_odom_covariance`** (기본 false, M 런치는 true): `/odom` 에 공분산을 싣는다. `ekf_m.yaml` 이 이 값에 맞춰져 있다.
+    뒤쪽 서보 버튼이 없는 구형 M 용이다. **`publish_odom_covariance`** (기본 false, M 런치는 true): `/odom` 에 공분산을 싣는다. `ekf_m.yaml` 이 이 값에 맞춰져 있다
+    (주행 중 회전 분산 1e-6 으로 바퀴가 방향을 잡고 IMU 는 바퀴가 끊길 때 대신한다. 근거는 `FillOdometryCovariance` 주석).
     구형 보드와 비상정지 동작은 `tools/board_sim/test_wheel_driver_legacy_m.py` 로 확인한다.
