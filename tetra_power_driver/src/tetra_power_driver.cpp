@@ -7,6 +7,7 @@
 #include <math.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <array>
 #include <atomic>
 #include <memory>
 #include <string>
@@ -127,13 +128,36 @@ static double UltrasonicRangeOrMax(double measured_range)
 	return nothing_detected ? m_dUltrasonicMaxRange : measured_range;
 }
 double m_dUltrasonic[8] = {0.0, };
-sensor_msgs::msg::Range range_msg1;
-sensor_msgs::msg::Range range_msg2;
-sensor_msgs::msg::Range range_msg3;
-sensor_msgs::msg::Range range_msg4;
+
+// 초음파 센서 4개. 순서는 보드가 보내는 순서(m_dUltrasonic[0..3])와 같다
+struct SonarChannel
+{
+	const char* frame_id;
+	const char* range_topic;
+	const char* points_topic;
+};
+constexpr size_t kSonarCount = 4;
+constexpr SonarChannel kSonarChannels[kSonarCount] = {
+	{"sonar_DL", "Ultrasonic_D_L", "range_points_DL"},
+	{"sonar_RL", "Ultrasonic_R_L", "range_points_RL"},
+	{"sonar_RR", "Ultrasonic_R_R", "range_points_RR"},
+	{"sonar_DR", "Ultrasonic_D_R", "range_points_DR"},
+};
+std::array<sensor_msgs::msg::Range, kSonarCount> range_msgs;
 
 // GPIO data
 interfaces::msg::Gpio gpio_msg;
+// gpio_status 메시지는 포트마다 필드가 따로다 (input0 ~ input7, output0 ~ output7). 반복문으로 채우려고 필드 위치를 표로 둔다
+constexpr size_t kGpioPortCount = 8;
+using GpioField = uint8_t interfaces::msg::Gpio::*;
+constexpr GpioField kGpioInputFields[kGpioPortCount] = {
+	&interfaces::msg::Gpio::input0, &interfaces::msg::Gpio::input1, &interfaces::msg::Gpio::input2, &interfaces::msg::Gpio::input3,
+	&interfaces::msg::Gpio::input4, &interfaces::msg::Gpio::input5, &interfaces::msg::Gpio::input6, &interfaces::msg::Gpio::input7,
+};
+constexpr GpioField kGpioOutputFields[kGpioPortCount] = {
+	&interfaces::msg::Gpio::output0, &interfaces::msg::Gpio::output1, &interfaces::msg::Gpio::output2, &interfaces::msg::Gpio::output3,
+	&interfaces::msg::Gpio::output4, &interfaces::msg::Gpio::output5, &interfaces::msg::Gpio::output6, &interfaces::msg::Gpio::output7,
+};
 int m_iOutput[8] = {0,};
 int m_iInput[8] = {0,};
 
@@ -203,16 +227,16 @@ public:
 		gpio_status_publisher = this->create_publisher<interfaces::msg::Gpio>("gpio_status", 10);
 
 		// Ultrasonic Option Publishers
-		Ultrasonic1_publisher = this->create_publisher<sensor_msgs::msg::Range>("Ultrasonic_D_L", 10);
-		Ultrasonic2_publisher = this->create_publisher<sensor_msgs::msg::Range>("Ultrasonic_R_L", 10);
-		Ultrasonic3_publisher = this->create_publisher<sensor_msgs::msg::Range>("Ultrasonic_R_R", 10);
-		Ultrasonic4_publisher = this->create_publisher<sensor_msgs::msg::Range>("Ultrasonic_D_R", 10);
+		for(size_t sonar = 0; sonar < kSonarCount; sonar++)
+		{
+			ultrasonic_publishers[sonar] = this->create_publisher<sensor_msgs::msg::Range>(kSonarChannels[sonar].range_topic, 10);
+		}
 
 		// Sonar range to PointCloud2
-		points_1 = this->create_publisher<sensor_msgs::msg::PointCloud2>("range_points_DL", 10);
-		points_2 = this->create_publisher<sensor_msgs::msg::PointCloud2>("range_points_RL", 10);
-		points_3 = this->create_publisher<sensor_msgs::msg::PointCloud2>("range_points_RR", 10);
-		points_4 = this->create_publisher<sensor_msgs::msg::PointCloud2>("range_points_DR", 10);
+		for(size_t sonar = 0; sonar < kSonarCount; sonar++)
+		{
+			points_publishers[sonar] = this->create_publisher<sensor_msgs::msg::PointCloud2>(kSonarChannels[sonar].points_topic, 10);
+		}
 
 		// Conveyor Option Publishers
 		conveyor_sensor_publisher = this->create_publisher<std_msgs::msg::Int32>("conveyor_sensor", 1);
@@ -320,16 +344,10 @@ public:
 	rclcpp::Publisher<interfaces::msg::Gpio>::SharedPtr gpio_status_publisher;
 
 	// Ultrasonic Option Publishers
-	rclcpp::Publisher<sensor_msgs::msg::Range>::SharedPtr Ultrasonic1_publisher;
-	rclcpp::Publisher<sensor_msgs::msg::Range>::SharedPtr Ultrasonic2_publisher;
-	rclcpp::Publisher<sensor_msgs::msg::Range>::SharedPtr Ultrasonic3_publisher;
-	rclcpp::Publisher<sensor_msgs::msg::Range>::SharedPtr Ultrasonic4_publisher;
+	std::array<rclcpp::Publisher<sensor_msgs::msg::Range>::SharedPtr, kSonarCount> ultrasonic_publishers;
 
 	// Ultrasonic PointCloud2 Publishers
-	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr points_1;
-	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr points_2;
-	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr points_3;
-	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr points_4;
+	std::array<rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr, kSonarCount> points_publishers;
 
 	// Conveyor Option Publishers
 	rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr conveyor_sensor_publisher;
@@ -367,10 +385,6 @@ public:
 		pub->publish(output);
 	}
 
-	void RangeToCloud_D_L(const sensor_msgs::msg::Range::SharedPtr range_msg) { RangeToCloud(range_msg, "sonar_DL", points_1); }
-	void RangeToCloud_R_L(const sensor_msgs::msg::Range::SharedPtr range_msg) { RangeToCloud(range_msg, "sonar_RL", points_2); }
-	void RangeToCloud_R_R(const sensor_msgs::msg::Range::SharedPtr range_msg) { RangeToCloud(range_msg, "sonar_RR", points_3); }
-	void RangeToCloud_D_R(const sensor_msgs::msg::Range::SharedPtr range_msg) { RangeToCloud(range_msg, "sonar_DR", points_4); }
 
 	// Custom Service Callback Functions
 	bool LED_Control_Command(const std::shared_ptr<interfaces::srv::LedControl::Request> request, const std::shared_ptr<interfaces::srv::LedControl::Response> response)
@@ -783,15 +797,9 @@ static void InitPowerBoard()
 	if(m_bUltrasonic_option) dssp_rs232_power_module_set_Ultrasonic(1);
 }
 
-int main(int argc, char * argv[])
+// 전원 보드 포트를 연다. 실패하면 false (노드를 끝낸다)
+static bool OpenPowerPort()
 {
-	rclcpp::init(argc, argv);
-	std::signal(SIGINT, signal_handler);
-	setvbuf(stdout, NULL, _IONBF, BUFSIZ);
-	auto node = std::make_shared<TETRAPowerDriver>();
-
-	rclcpp::WallRate loop_rate(30);
-
 	if(port[0] == '\0')
 	{
 		sprintf(port, "/dev/ttyS1");
@@ -801,14 +809,160 @@ int main(int argc, char * argv[])
 	if(dssp_rs232_power_module_create(port, 200) == 0)
 	{
 		printf("TETRA_Power_rs232 Port (%s) Open Success\n", port);
+		return true;
 	}
-	else
+	printf("TETRA_Power_rs232 Port (%s) Open Error!\n", port);
+	return false;
+}
+
+// 초음파 Range 메시지에서 바뀌지 않는 값. 예전에는 매 주기 다시 넣었다. ultrasonic_max_range 는 노드 생성자가 읽으므로 그 뒤에 부른다
+static void InitSonarMessages()
+{
+	for(size_t sonar = 0; sonar < kSonarCount; sonar++)
 	{
-		printf("TETRA_Power_rs232 Port (%s) Open Error!\n", port);
+		range_msgs[sonar].header.frame_id = kSonarChannels[sonar].frame_id;
+		range_msgs[sonar].radiation_type = 0;
+		range_msgs[sonar].field_of_view = (60.0/180.0) * M_PI;
+		range_msgs[sonar].min_range = Ultrasonic_MIN_range;
+		range_msgs[sonar].max_range = m_dUltrasonicMaxRange;
+	}
+}
+
+// 보드를 읽지 못한 주기: 끊김을 한 번 알리고, 끊겨 있는 동안 서보를 끄게 하며 포트를 다시 연다
+static void HandleBoardReadFailure(TETRAPowerDriver& node, std::chrono::steady_clock::time_point& last_reconnect_attempt)
+{
+	m_iFlag_PowerCheck_cnt++;
+	if(m_iFlag_PowerCheck_cnt == 1)
+	{
+		printf("!!!! Power Board data read Error(m_iPowerCheck: %d) !!!! \n", m_iPowerCheck);
+	}
+	if(m_iFlag_PowerCheck_cnt == kPowerReadFailuresBeforeStop)
+	{
+		// 한 번만 알리고 파일로 남긴다. 예전에는 끊겨 있는 동안 매 주기 로그 파일을 새로 만들었다
+		printf("[Error]: Power Board Disconnect !!! \n");
+		Error_Log_write("Power Board Disconnect !!!");
+		// 예전에는 실패하면 continue 로 넘어가 이 코드를 발행하지 않아, 구동 드라이버의 전원 에러 정지가 동작하지 않았다
+		std_msgs::msg::Int32 power_status;
+		power_status.data = kPowerBoardNoResponse;
+		node.power_status_publisher->publish(power_status);
+	}
+	if(m_iFlag_PowerCheck_cnt >= kPowerReadFailuresBeforeStop)
+	{
+		std_msgs::msg::Int32 servo;
+		servo.data = 2;
+		node.servo_publisher->publish(servo);
+
+		// USB 를 뺐다 꽂으면 예전 fd 로는 계속 실패하므로 포트를 새로 연다
+		if(std::chrono::duration<double>(std::chrono::steady_clock::now() - last_reconnect_attempt).count() >= kReconnectIntervalSec)
+		{
+			last_reconnect_attempt = std::chrono::steady_clock::now();
+			if(dssp_rs232_power_module_create(port, 200) == 0) InitPowerBoard();
+		}
+	}
+}
+
+// 보드 상태, 배터리, 도킹 접점
+static void PublishPowerStatus(TETRAPowerDriver& node)
+{
+	// Power Board Status Check
+	std_msgs::msg::Int32 power_status;
+	power_status.data = m_iPowerCheck;
+	node.power_status_publisher->publish(power_status);
+
+	// Battery Level Check
+	std_msgs::msg::Int32 battery_level;
+	m_ibattery_Level = (int)m_dbattery;
+	battery_level.data = m_ibattery_Level;
+	node.tetra_battery_publisher->publish(battery_level);
+
+	// Battery Voltage Check
+	std_msgs::msg::Float64 battery_voltage;
+	battery_voltage.data = m_dVoltage;
+	node.battery_voltage_publisher->publish(battery_voltage);
+
+	// Battery Current Check
+	std_msgs::msg::Float64 battery_current;
+	battery_current.data = m_dCurrent;
+	node.battery_current_publisher->publish(battery_current);
+
+	// Docking Status Check
+	std_msgs::msg::Int32 docking_status;
+	docking_status.data = m_imode_status;
+	node.docking_status_publisher->publish(docking_status);
+}
+
+static void PublishGpio(TETRAPowerDriver& node)
+{
+	// GPIO Check
+	for(size_t gpio_port = 0; gpio_port < kGpioPortCount; gpio_port++)
+	{
+		gpio_msg.*kGpioInputFields[gpio_port] = m_iInput[gpio_port];
+		gpio_msg.*kGpioOutputFields[gpio_port] = m_iOutput[gpio_port];
+	}
+	node.gpio_status_publisher->publish(gpio_msg);
+}
+
+static void PublishSonar(TETRAPowerDriver& node)
+{
+	// Ultrasonic data Check Option
+	for(size_t sonar = 0; sonar < kSonarCount; sonar++)
+	{
+		range_msgs[sonar].range = UltrasonicRangeOrMax(m_dUltrasonic[sonar]);
+		range_msgs[sonar].header.stamp = node.current_time;
+	}
+
+	if(m_bUltrasonic_option)
+	{
+		for(size_t sonar = 0; sonar < kSonarCount; sonar++)
+		{
+			node.ultrasonic_publishers[sonar]->publish(range_msgs[sonar]);
+		}
+		for(size_t sonar = 0; sonar < kSonarCount; sonar++)
+		{
+			node.RangeToCloud(std::make_shared<sensor_msgs::msg::Range>(range_msgs[sonar]),
+				kSonarChannels[sonar].frame_id, node.points_publishers[sonar]);
+		}
+	}
+}
+
+static void PublishConveyor(TETRAPowerDriver& node)
+{
+	// Conveyor Option Check
+	if(m_bConveyor_option)
+	{
+		// 읽지 못한 값을 내보내면 API 가 적재 상태를 0(빈 상태)으로 바꾼다
+		std_msgs::msg::Int32 conveyor_sensor;
+		if(dssp_rs232_power_module_read_conveyor_sensor(&m_dConveyor_sensor) == 0)
+		{
+			conveyor_sensor.data = m_dConveyor_sensor;
+			node.conveyor_sensor_publisher->publish(conveyor_sensor);
+		}
+
+		std_msgs::msg::Int32 conveyor_movement;
+		if(dssp_rs232_power_module_read_conveyor_movement(&m_iConveyor_movement) == 0)
+		{
+			conveyor_movement.data = m_iConveyor_movement;
+			node.conveyor_movement_publisher->publish(conveyor_movement);
+		}
+	}
+}
+
+int main(int argc, char * argv[])
+{
+	rclcpp::init(argc, argv);
+	std::signal(SIGINT, signal_handler);
+	setvbuf(stdout, NULL, _IONBF, BUFSIZ);
+	auto node = std::make_shared<TETRAPowerDriver>();
+
+	rclcpp::WallRate loop_rate(30);
+
+	if(!OpenPowerPort())
+	{
 		return -1;
 	}
 
 	InitPowerBoard();
+	InitSonarMessages();
 	auto last_reconnect_attempt = std::chrono::steady_clock::now();
 
 	printf("=========================================\n");
@@ -826,164 +980,21 @@ int main(int argc, char * argv[])
 		m_iPowerCheck = dssp_rs232_power_module_read_tetra(&m_dbattery, &m_dVoltage, &m_dCurrent, &m_imode_status, m_iInput, m_iOutput, m_dUltrasonic);
 		if(m_iPowerCheck < 0)
 		{
-			m_iFlag_PowerCheck_cnt++;
-			if(m_iFlag_PowerCheck_cnt == 1)
-			{
-				printf("!!!! Power Board data read Error(m_iPowerCheck: %d) !!!! \n", m_iPowerCheck);
-			}
-			if(m_iFlag_PowerCheck_cnt == kPowerReadFailuresBeforeStop)
-			{
-				// 한 번만 알리고 파일로 남긴다. 예전에는 끊겨 있는 동안 매 주기 로그 파일을 새로 만들었다
-				printf("[Error]: Power Board Disconnect !!! \n");
-				Error_Log_write("Power Board Disconnect !!!");
-				// 예전에는 실패하면 continue 로 넘어가 이 코드를 발행하지 않아, 구동 드라이버의 전원 에러 정지가 동작하지 않았다
-				std_msgs::msg::Int32 power_status;
-				power_status.data = kPowerBoardNoResponse;
-				node->power_status_publisher->publish(power_status);
-			}
-			if(m_iFlag_PowerCheck_cnt >= kPowerReadFailuresBeforeStop)
-			{
-				std_msgs::msg::Int32 servo;
-				servo.data = 2;
-				node->servo_publisher->publish(servo);
-
-				// USB 를 뺐다 꽂으면 예전 fd 로는 계속 실패하므로 포트를 새로 연다
-				if(std::chrono::duration<double>(std::chrono::steady_clock::now() - last_reconnect_attempt).count() >= kReconnectIntervalSec)
-				{
-					last_reconnect_attempt = std::chrono::steady_clock::now();
-					if(dssp_rs232_power_module_create(port, 200) == 0) InitPowerBoard();
-				}
-			}
+			HandleBoardReadFailure(*node, last_reconnect_attempt);
 			loop_rate.sleep();
 			continue;
 		}
-		else
+		if(m_iFlag_PowerCheck_cnt >= kPowerReadFailuresBeforeStop)
 		{
-			if(m_iFlag_PowerCheck_cnt >= kPowerReadFailuresBeforeStop)
-			{
-				printf("Power Board connection restored\n");
-			}
-			m_iFlag_PowerCheck_cnt = 0;
+			printf("Power Board connection restored\n");
 		}
+		m_iFlag_PowerCheck_cnt = 0;
 
-		// Power Board Status Check
-		std_msgs::msg::Int32 power_status;
-		power_status.data = m_iPowerCheck;
-		node->power_status_publisher->publish(power_status);
+		PublishPowerStatus(*node);
+		PublishGpio(*node);
+		PublishSonar(*node);
+		PublishConveyor(*node);
 
-		// Battery Level Check
-		std_msgs::msg::Int32 battery_level;
-		m_ibattery_Level = (int)m_dbattery;
-		battery_level.data = m_ibattery_Level;
-		node->tetra_battery_publisher->publish(battery_level);
-
-		// Battery Voltage Check
-		std_msgs::msg::Float64 battery_voltage;
-		battery_voltage.data = m_dVoltage;
-		node->battery_voltage_publisher->publish(battery_voltage);
-
-		// Battery Current Check
-		std_msgs::msg::Float64 battery_current;
-		battery_current.data = m_dCurrent;
-		node->battery_current_publisher->publish(battery_current);
-
-		// Docking Status Check
-		std_msgs::msg::Int32 docking_status;
-		docking_status.data = m_imode_status;
-		node->docking_status_publisher->publish(docking_status);
-		
-		// GPIO Check
-		gpio_msg.input0 = m_iInput[0];
-		gpio_msg.input1 = m_iInput[1];
-		gpio_msg.input2 = m_iInput[2];
-		gpio_msg.input3 = m_iInput[3];
-		gpio_msg.input4 = m_iInput[4];
-		gpio_msg.input5 = m_iInput[5];
-		gpio_msg.input6 = m_iInput[6];
-		gpio_msg.input7 = m_iInput[7];
-
-		gpio_msg.output0 = m_iOutput[0];
-		gpio_msg.output1 = m_iOutput[1];
-		gpio_msg.output2 = m_iOutput[2];
-		gpio_msg.output3 = m_iOutput[3];
-		gpio_msg.output4 = m_iOutput[4];
-		gpio_msg.output5 = m_iOutput[5];
-		gpio_msg.output6 = m_iOutput[6];
-		gpio_msg.output7 = m_iOutput[7];
-		node->gpio_status_publisher->publish(gpio_msg);
-
-		// Ultrasonic data Check Option
-		char frameid1[] = "sonar_DL";
-		range_msg1.header.frame_id = frameid1;
-		range_msg1.radiation_type = 0;
-		range_msg1.field_of_view = (60.0/180.0) * M_PI;
-		range_msg1.min_range = Ultrasonic_MIN_range; 
-		range_msg1.max_range = m_dUltrasonicMaxRange; 
-
-		char frameid2[] = "sonar_RL";
-		range_msg2.header.frame_id = frameid2;
-		range_msg2.radiation_type = 0;
-		range_msg2.field_of_view = (60.0/180.0) * M_PI;
-		range_msg2.min_range = Ultrasonic_MIN_range;
-		range_msg2.max_range = m_dUltrasonicMaxRange;
-
-		char frameid3[] = "sonar_RR";
-		range_msg3.header.frame_id = frameid3;
-		range_msg3.radiation_type = 0;
-		range_msg3.field_of_view = (60.0/180.0) * M_PI;
-		range_msg3.min_range = Ultrasonic_MIN_range;
-		range_msg3.max_range = m_dUltrasonicMaxRange;
-
-		char frameid4[] = "sonar_DR";
-		range_msg4.header.frame_id = frameid4;
-		range_msg4.radiation_type = 0;
-		range_msg4.field_of_view = (60.0/180.0) * M_PI;
-		range_msg4.min_range = Ultrasonic_MIN_range;
-		range_msg4.max_range = m_dUltrasonicMaxRange;
-
-		range_msg1.range = UltrasonicRangeOrMax(m_dUltrasonic[0]);
-		range_msg1.header.stamp = node->current_time;
-
-		range_msg2.range = UltrasonicRangeOrMax(m_dUltrasonic[1]);
-		range_msg2.header.stamp = node->current_time;
-
-		range_msg3.range = UltrasonicRangeOrMax(m_dUltrasonic[2]);
-		range_msg3.header.stamp = node->current_time;
-
-		range_msg4.range = UltrasonicRangeOrMax(m_dUltrasonic[3]);
-		range_msg4.header.stamp = node->current_time;
-
-		if(m_bUltrasonic_option)
-		{
-			node->Ultrasonic1_publisher->publish(range_msg1);
-			node->Ultrasonic2_publisher->publish(range_msg2);
-			node->Ultrasonic3_publisher->publish(range_msg3);
-			node->Ultrasonic4_publisher->publish(range_msg4);
-			node->RangeToCloud_D_L(std::make_shared<sensor_msgs::msg::Range>(range_msg1));
-			node->RangeToCloud_R_L(std::make_shared<sensor_msgs::msg::Range>(range_msg2));
-			node->RangeToCloud_R_R(std::make_shared<sensor_msgs::msg::Range>(range_msg3));
-			node->RangeToCloud_D_R(std::make_shared<sensor_msgs::msg::Range>(range_msg4));
-		}
-
-		// Conveyor Option Check
-		if(m_bConveyor_option)
-		{
-			// 읽지 못한 값을 내보내면 API 가 적재 상태를 0(빈 상태)으로 바꾼다
-			std_msgs::msg::Int32 conveyor_sensor;
-			if(dssp_rs232_power_module_read_conveyor_sensor(&m_dConveyor_sensor) == 0)
-			{
-				conveyor_sensor.data = m_dConveyor_sensor;
-				node->conveyor_sensor_publisher->publish(conveyor_sensor);
-			}
-
-			std_msgs::msg::Int32 conveyor_movement;
-			if(dssp_rs232_power_module_read_conveyor_movement(&m_iConveyor_movement) == 0)
-			{
-				conveyor_movement.data = m_iConveyor_movement;
-				node->conveyor_movement_publisher->publish(conveyor_movement);
-			}
-		}
-		
 		loop_rate.sleep();
     }
 
