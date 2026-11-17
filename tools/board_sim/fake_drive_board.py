@@ -30,6 +30,9 @@ class FakeDriveBoard:
         self.left_error = ord('0')
         self.right_error = ord('0')
         self.responding = True
+        # 구형 M 구동보드: velocity2 응답이 16바이트(속도 4바이트 없음)이고, 비상정지 동안 주행 명령을 FLAG_FAIL 로 거부한다
+        self.legacy_frame = False
+        self.emg = False
         self.log = []  # (time, command, payload)
         self.lock = threading.Lock()
         self._last = time.monotonic()
@@ -99,17 +102,24 @@ class FakeDriveBoard:
                 mag = int(abs(value)) & 0x7FFFFFFF
                 raw = mag | (0x80000000 if value < 0 else 0)
                 return raw.to_bytes(4, 'big')
+            if self.emg:
+                self.left_mm_s = self.right_mm_s = 0
+                os.write(self.master, bytes([STX, 0x32, ETX, lrc([0x32, ETX])]))
+                return
             theta = int(round(math.degrees(self.theta_rad) * 10)) % 3600
             body = bytes([FLAG_OK]) + signed32(self.x_mm) + signed32(self.y_mm)
-            body += theta.to_bytes(2, 'big') + b'\x00\x00\x00\x00' + bytes([0x00, 0x00])
+            body += theta.to_bytes(2, 'big') + (b'' if self.legacy_frame else b'\x00\x00\x00\x00') + bytes([0x00, 0x00])
             frame = bytes([STX]) + body + bytes([ETX])
             frame += bytes([lrc(frame[1:])])
-            assert len(frame) == 20
+            assert len(frame) == (16 if self.legacy_frame else 20)
             os.write(self.master, frame)
         elif cmd == 'AA':
             # [3] left error, [5] right error, [6],[7] bumper nibbles (servo bit 0x02 = off), [8] emg
-            servo_bit = 0x00 if self.servo else 0x02
-            body = bytes([FLAG_OK, ord('0'), self.left_error, ord('0'), self.right_error, 0x00, servo_bit, 0x00])
+            # 구형 M 에는 서보 버튼이 없어 이 비트가 늘 0 이다
+            servo_bit = 0x00 if self.servo or self.legacy_frame else 0x02
+            left = ord('1') if self.emg else self.left_error
+            right = ord('1') if self.emg else self.right_error
+            body = bytes([FLAG_OK, ord('0'), left, ord('0'), right, 0x00, servo_bit, 0x01 if self.emg else 0x00])
             self._send(body)
         elif cmd == 'AC' and payload == b'1':
             theta = int(round(math.degrees(self.theta_rad) * 10)) % 3600

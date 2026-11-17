@@ -230,6 +230,9 @@ void signal_handler(int signal)
     stop_requested = true;
 }
 
+// /odom 공분산 발행 여부 (publish_odom_covariance)
+bool m_bPublishOdomCovariance = false;
+
 // 모터 드라이버 에러 코드: '0'(48) 정상, '1'(49) 비상정지, '5'(53) 저전압
 constexpr int kMotorErrorNone = 48;
 constexpr int kMotorErrorEmergencyStop = 49;
@@ -256,6 +259,11 @@ public:
 		// cmd_vel_nav 를 직접 받으면 collision_monitor 가 0(정지)을 보낸 직후 원본 명령으로 다시 움직이므로 기본은 받지 않는다.
 		// true 는 예전 동작(cmd_vel_nav2 가 없을 때 cmd_vel_nav 사용)으로 되돌릴 때만 쓴다
 		this->declare_parameter("use_raw_nav_cmd", false);
+		// 구형 M 은 뒤쪽 서보 ON/OFF 버튼이 없어, 비상정지 버튼을 누르면 서보를 풀어 손으로 밀 수 있게 한다.
+		// 서보 버튼이 따로 있는 모델은 false 로 두면 비상정지 동안 서보 상태를 드라이버가 바꾸지 않는다
+		this->declare_parameter("emg_releases_servo", false);
+		// /odom 에 공분산을 싣는다 (FillOdometryCovariance). EKF 가 바퀴와 IMU 를 섞어 쓰는 모델에서만 켠다
+		this->declare_parameter("publish_odom_covariance", false);
 
 		// Get parameters
 		std::string robot_model = this->get_parameter("robot_model").as_string();
@@ -264,6 +272,8 @@ public:
 		m_bEKF_option = this->get_parameter("m_bEKF_option").as_bool();
 		m_dCmdVelTimeout = this->get_parameter("cmd_vel_timeout").as_double();
 		const bool use_raw_nav_cmd = this->get_parameter("use_raw_nav_cmd").as_bool();
+		emg_releases_servo_ = this->get_parameter("emg_releases_servo").as_bool();
+		m_bPublishOdomCovariance = this->get_parameter("publish_odom_covariance").as_bool();
 		m_dMaxLinearVelocity = std::fabs(this->get_parameter("max_linear_velocity").as_double());
 		m_dMaxAngularVelocity = std::fabs(this->get_parameter("max_angular_velocity").as_double());
 
@@ -486,6 +496,56 @@ public:
 
 	bool IsFaultLatched() const { return fault_latched_; }
 
+	// 비상정지 버튼으로 서보를 푸는 동작 (emg_releases_servo).
+	// 누르면 바로 서보를 끄고, 버튼이 풀린 상태가 kEmgReleaseCycles 주기 이어지면 에러를 지우고 서보를 다시 켠다.
+	// 접점이 떨리는 한두 주기에 서보가 켜졌다 꺼지지 않게 풀림 쪽에만 여유를 둔다
+	static constexpr int kEmgReleaseCycles = 6;
+	bool emg_releases_servo_ = false;
+	bool servo_released_by_emg_ = false;
+	int emg_clear_cycles_ = 0;
+
+	static bool IsEmergencyStopActive()
+	{
+		return m_emg_state != 0 || m_left_error_code == kMotorErrorEmergencyStop || m_right_error_code == kMotorErrorEmergencyStop;
+	}
+
+	bool IsServoReleasedByEmergencyStop() const { return servo_released_by_emg_; }
+
+	void UpdateEmergencyServoRelease()
+	{
+		if(!emg_releases_servo_) return;
+
+		if(m_emg_state != 0)
+		{
+			emg_clear_cycles_ = 0;
+			if(servo_released_by_emg_) return;
+			{
+				// 풀린 뒤 예전 명령으로 다시 출발하지 않게 한다
+				std::lock_guard<std::mutex> lock(mutex_);
+				linear = 0.0;
+				angular = 0.0;
+			}
+			dssp_rs232_drv_module_set_servo(0);
+			servo_released_by_emg_ = true;
+			RCLCPP_WARN(this->get_logger(), "비상정지 버튼이 눌려 서보를 풉니다");
+			return;
+		}
+
+		if(!servo_released_by_emg_ || ++emg_clear_cycles_ < kEmgReleaseCycles) return;
+		servo_released_by_emg_ = false;
+		emg_clear_cycles_ = 0;
+		dssp_rs232_drv_module_set_drive_err_reset();
+		usleep(1000);
+		// 모터 에러로 멈춰 둔 상태이거나 서보 버튼이 꺼져 있으면 비상정지가 풀려도 켜지 않는다
+		if(!IsFaultLatched() && IsServoEnabled(m_bumper_data))
+		{
+			dssp_rs232_drv_module_set_velocitymode();
+			usleep(10000);
+			dssp_rs232_drv_module_set_servo(1);
+		}
+		RCLCPP_INFO(this->get_logger(), "비상정지가 풀려 서보를 다시 켭니다");
+	}
+
 	// 일시적인 노이즈로 오탐하지 않도록 구형 ACK 가 연속으로 들어올 때만 비호환으로 판정한다.
 	static constexpr int kLegacyAckThreshold = 20;
 	int legacy_ack_streak_ = 0;
@@ -517,7 +577,10 @@ public:
 				PublishDriveBoardIncompatible(false);
 				break;
 			case DRVM_RESP_LEGACY_ACK:
-				if(++legacy_ack_streak_ >= kLegacyAckThreshold) PublishDriveBoardIncompatible(true);
+				// 비상정지 동안에는 보드가 주행 명령을 FLAG_FAIL 로 거부하는 것이 정상이다. 이를 세면 버튼을 누를 때마다
+				// 관제에 "구동보드가 주행 명령을 처리하지 못합니다" 가 뜬다
+				if(IsEmergencyStopActive()) legacy_ack_streak_ = 0;
+				else if(++legacy_ack_streak_ >= kLegacyAckThreshold) PublishDriveBoardIncompatible(true);
 				break;
 			default:
 				// 무응답(보드 분리 등)은 보드 버전과 무관하므로 판정을 바꾸지 않는다.
@@ -854,6 +917,42 @@ static void InitDriveBoard()
 	usleep(10000);
 }
 
+// 공분산을 0 으로 두면 EKF 가 바퀴 값을 오차 없는 값으로 받아 IMU 를 사실상 쓰지 않는다 (바퀴가 미끄러져도 그대로 믿는다).
+// 바퀴는 직진 속도는 정확하고 회전은 미끄러짐 때문에 덜 정확하므로, 회전 쪽 분산을 IMU 자이로(약 1e-4)보다 크게 준다.
+// 그러면 평소 방향은 IMU 가 잡고, IMU 가 끊기면 바퀴 회전 속도로 이어 간다.
+// 바퀴가 서 있을 때는 로봇이 돌고 있지 않은 것이 확실하므로 회전 분산을 아주 작게 줘, 자이로 영점 오차로 방향이 흘러가지 않게 한다.
+// publish_odom_covariance 를 켠 모델만 쓴다 (EKF 설정이 이 값에 맞춰져 있어야 한다. tetra_bringup/params/ekf_m.yaml)
+static void FillOdometryCovariance(nav_msgs::msg::Odometry & odom)
+{
+	if(!m_bPublishOdomCovariance) return;
+	constexpr double kStandstillVelocity = 1e-4;
+	constexpr double kStandstillYawRateVariance = 1e-9;
+	const bool standing_still = std::fabs(odom.twist.twist.linear.x) < kStandstillVelocity
+		&& std::fabs(odom.twist.twist.angular.z) < kStandstillVelocity;
+	constexpr double kPositionVariance = 1e-3;       // (m)^2
+	constexpr double kYawVariance = 3e-2;            // (rad)^2
+	constexpr double kLinearVelocityVariance = 1e-3; // (m/s)^2
+	constexpr double kLateralVelocityVariance = 1e-4; // 차동 구동은 옆으로 가지 않는다
+	constexpr double kYawRateVariance = 2e-2;        // (rad/s)^2
+	constexpr double kUnusedVariance = 1e6;          // z, roll, pitch 는 재지 않는다
+
+	odom.pose.covariance.fill(0.0);
+	odom.pose.covariance[0] = kPositionVariance;
+	odom.pose.covariance[7] = kPositionVariance;
+	odom.pose.covariance[14] = kUnusedVariance;
+	odom.pose.covariance[21] = kUnusedVariance;
+	odom.pose.covariance[28] = kUnusedVariance;
+	odom.pose.covariance[35] = kYawVariance;
+
+	odom.twist.covariance.fill(0.0);
+	odom.twist.covariance[0] = kLinearVelocityVariance;
+	odom.twist.covariance[7] = kLateralVelocityVariance;
+	odom.twist.covariance[14] = kUnusedVariance;
+	odom.twist.covariance[21] = kUnusedVariance;
+	odom.twist.covariance[28] = kUnusedVariance;
+	odom.twist.covariance[35] = standing_still ? kStandstillYawRateVariance : kYawRateVariance;
+}
+
 static double NormalizeAngle(double angle)
 {
 	return std::atan2(std::sin(angle), std::cos(angle));
@@ -1015,15 +1114,29 @@ int main(int argc, char * argv[])
 			coordinates[1] = (m_dY_pos / 1000.0);
 			coordinates[2] = m_dTheta * (M_PI / 1800.0);
 
-			if(!bPosition_mode_flag)
+			if(node->IsServoReleasedByEmergencyStop())
+			{
+				// 서보를 푼 동안에는 주행 명령을 보내지 않는다 (보드가 거부하고, 구형 보드는 그 응답을 기다리느라 루프가 느려진다).
+				// 버튼 상태만 계속 읽는다
+				control_linear = 0.0;
+				control_angular = 0.0;
+				dssp_rs232_drv_module_read_bumper_emg(&m_bumper_data, &m_emg_state, &m_left_error_code, &m_right_error_code);
+			}
+			else if(!bPosition_mode_flag)
 			{
 				node->SetMoveCommand(control_linear, control_angular);
 				dssp_rs232_drv_module_read_bumper_emg(&m_bumper_data, &m_emg_state, &m_left_error_code, &m_right_error_code);
 			}
 
-			node->HandleMotorErrors(m_left_error_code, m_right_error_code);
+			node->UpdateEmergencyServoRelease();
+			// 비상정지로 서보를 푼 동안 에러를 리셋하고 서보를 다시 켜면 버튼을 누른 채로 모터에 힘이 들어간다
+			if(!node->IsServoReleasedByEmergencyStop()) node->HandleMotorErrors(m_left_error_code, m_right_error_code);
 
-			if(IsServoEnabled(m_bumper_data)) 
+			if(node->IsServoReleasedByEmergencyStop())
+			{
+				// 서보 버튼 처리는 비상정지가 풀린 뒤로 미룬다
+			}
+			else if(IsServoEnabled(m_bumper_data)) 
 			{
 				if(m_bflag_bumper)
 				{
@@ -1109,6 +1222,7 @@ int main(int argc, char * argv[])
 				odom.twist.twist.linear.y = velocity[1];
 				odom.twist.twist.linear.z = 0.0;
 				odom.twist.twist.angular.z = velocity[2];
+				FillOdometryCovariance(odom);
 				node->odom_publisher->publish(odom);
 
 				node->last_time = node->current_time;

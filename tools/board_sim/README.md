@@ -8,6 +8,7 @@
 | `fake_drive_board.py` | 가상 구동 보드. 속도 명령을 받아 위치를 적분하고, 에러 코드·무응답을 흉내 낼 수 있음 |
 | `fake_power_board.py` | 가상 전원 보드. 배터리·데이터 읽기와 ASCII 명령에 응답, 무응답을 흉내 낼 수 있음 |
 | `test_wheel_driver.py` | 바퀴 드라이버 시나리오 14개 (아래) |
+| `test_wheel_driver_legacy_m.py` | 구형 M 구동보드 시나리오 10개: 16바이트 velocity2 응답에서 30Hz 유지, 명령이 끊기면 1초 안에 정지, 비상정지 버튼으로 서보 풀기·복귀, 비상정지를 구동보드 고장으로 알리지 않음 |
 | `test_power_driver.py` | 전원 드라이버 시나리오 11개 (아래) |
 
 ## 실행
@@ -20,6 +21,7 @@ source install/setup.bash
 export WS=$PWD               # 워크스페이스 루트 (install/ 이 있는 곳)
 export ROS_DOMAIN_ID=77      # 다른 로봇·노드와 섞이지 않게
 python3 -P <tetra_driver>/tools/board_sim/test_wheel_driver.py
+python3 -P <tetra_driver>/tools/board_sim/test_wheel_driver_legacy_m.py
 python3 -P <tetra_driver>/tools/board_sim/test_power_driver.py
 ```
 

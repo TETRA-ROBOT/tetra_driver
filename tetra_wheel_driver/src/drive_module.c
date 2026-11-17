@@ -556,6 +556,52 @@ static int is_legacy_velocity2_ack(const unsigned char *packet_buf)
 	return packet_buf[0] == 0x02 && packet_buf[1] == 0x32 && packet_buf[2] == 0x03;
 }
 
+/* velocity2 응답 길이. 지금 보드는 20바이트(x, y, θ, 좌·우 속도, 범퍼, EMG)이고, 구형 M 구동보드는 속도 4바이트가 없는
+ * 16바이트(x, y, θ, 2바이트)를 준다. 20바이트를 기다리면 구형 보드에서는 매 주기 read 타임아웃(0.2초)까지 멈춰
+ * 제어 루프가 30Hz 가 아니라 약 5Hz 로 돌고, 조그에서 손을 떼도 한참 더 간다. 그래서 짧은 프레임이 연속으로 오면 길이를 바꾼다. */
+#define DRVM_VELOCITY2_FRAME        20
+#define DRVM_VELOCITY2_SHORT_FRAME  16
+#define DRVM_FRAME_SWITCH_STREAK    3
+#define DRVM_FRAME_REVERT_STREAK    10
+static int s_velocity2_frame_length = DRVM_VELOCITY2_FRAME;
+static int s_frame_mismatch_streak = 0;
+
+static int is_velocity2_frame(const unsigned char *packet_buf, int length)
+{
+	return packet_buf[0] == 0x02 && (packet_buf[1] == 0x30 || packet_buf[1] == 0x32)
+		&& packet_buf[length - 2] == 0x03 && packet_buf[length - 1] == make_lrc((unsigned char *)&packet_buf[1], length - 2);
+}
+
+/* 20바이트를 기다리다 타임아웃된 버퍼가 사실은 온전한 16바이트 프레임인지 (나머지는 memset 한 0 그대로) */
+static int is_short_frame_in_long_read(const unsigned char *packet_buf)
+{
+	int i;
+	for(i = DRVM_VELOCITY2_SHORT_FRAME; i < DRVM_VELOCITY2_FRAME; i++)
+	{
+		if(packet_buf[i] != 0) return 0;
+	}
+	return is_velocity2_frame(packet_buf, DRVM_VELOCITY2_SHORT_FRAME);
+}
+
+int drvm_velocity2_frame_length(void)
+{
+	return s_velocity2_frame_length;
+}
+
+static void parse_velocity2_pose(const unsigned char *packet_buf, double *x, double *y, double *theta)
+{
+	m_check_X = (packet_buf[2] >> 7);
+	buf_x = (packet_buf[5] & 0xff) | ((packet_buf[4] << 8) & 0xff00) | ((packet_buf[3] << 16) & 0xff0000) | ((packet_buf[2] << 24) & 0x7f000000);
+	*x = (m_check_X == 0) ? (double)buf_x : -1.0 * (double)buf_x;
+
+	m_check_Y = (packet_buf[6] >> 7);
+	buf_y = (packet_buf[9] & 0xff) | ((packet_buf[8] << 8) & 0xff00) | ((packet_buf[7] << 16) & 0xff0000) | ((packet_buf[6] << 24) & 0x7f000000);
+	*y = (m_check_Y == 0) ? (double)buf_y : -1.0 * (double)buf_y;
+
+	uint16_t raw_theta = (packet_buf[11] & 0xff) | ((packet_buf[10] << 8) & 0xff00);
+	*theta = (double)raw_theta;
+}
+
 int drvm_set_velocity2(int fd, int left, int right, double *x, double *y, double *theta, double *velocity_l, double *velocity_r, int *bumper, int *emg)
 {
 	int ret;
@@ -591,37 +637,46 @@ int drvm_set_velocity2(int fd, int left, int right, double *x, double *y, double
 
 	if(ret <= 0) return -2;
 	memset(packet_buf, 0, sizeof(unsigned char)*255);
-	ret = get_response_fixed(fd, packet_buf, sizeof(packet_buf), 20);
+	ret = get_response_fixed(fd, packet_buf, sizeof(packet_buf), s_velocity2_frame_length);
+
+	if(s_velocity2_frame_length == DRVM_VELOCITY2_SHORT_FRAME)
+	{
+		// 구형 프레임에는 속도가 없고 범퍼·EMG 는 호출한 쪽이 'AA' 로 읽으므로 위치만 쓴다
+		if(is_velocity2_frame(packet_buf, DRVM_VELOCITY2_SHORT_FRAME))
+		{
+			s_frame_mismatch_streak = 0;
+			s_velocity2_response = DRVM_RESP_OK;
+			parse_velocity2_pose(packet_buf, x, y, theta);
+			return 0;
+		}
+		// 보드를 새것으로 바꿨다면 20바이트 프레임의 앞 16바이트만 읽게 되어 계속 어긋난다
+		if(!is_legacy_velocity2_ack(packet_buf) && ++s_frame_mismatch_streak >= DRVM_FRAME_REVERT_STREAK)
+		{
+			s_frame_mismatch_streak = 0;
+			s_velocity2_frame_length = DRVM_VELOCITY2_FRAME;
+			printf("[drive] velocity2 응답을 20바이트로 다시 읽습니다\n");
+		}
+	}
+	else if(is_short_frame_in_long_read(packet_buf))
+	{
+		if(++s_frame_mismatch_streak >= DRVM_FRAME_SWITCH_STREAK)
+		{
+			s_frame_mismatch_streak = 0;
+			s_velocity2_frame_length = DRVM_VELOCITY2_SHORT_FRAME;
+			printf("[drive] 구형 구동보드의 16바이트 velocity2 응답을 감지했습니다. 이후 16바이트로 읽습니다\n");
+		}
+		s_velocity2_response = DRVM_RESP_OK;
+		parse_velocity2_pose(packet_buf, x, y, theta);
+		return 0;
+	}
+
 	// FLAG_FAIL(0x32) 프레임도 odometry 를 싣고 오므로 받아들이되, LRC 가 맞을 때만 쓴다.
 	// 깨진 프레임으로 x·y·θ 를 덮어쓰면 오도메트리가 한 주기 튄다.
-	if(packet_buf[0] == 0x02 && (packet_buf[1] == 0x30 || packet_buf[1] == 0x32) && packet_buf[18] == 0x03
-		&& packet_buf[19] == make_lrc(&packet_buf[1], 18))
+	if(s_velocity2_frame_length == DRVM_VELOCITY2_FRAME && is_velocity2_frame(packet_buf, DRVM_VELOCITY2_FRAME))
 	{
+		s_frame_mismatch_streak = 0;
 		s_velocity2_response = DRVM_RESP_OK;
-		m_check_X = (packet_buf[2] >> 7);
-		buf_x = (packet_buf[5] & 0xff) | ((packet_buf[4] << 8) & 0xff00) | ((packet_buf[3] << 16) & 0xff0000) | ((packet_buf[2] << 24) & 0x7f000000);
-		if(m_check_X == 0)
-		{
-			*x = 1.0 * (double)buf_x;
-		}
-		else
-		{
-			*x = -1.0 * (double)buf_x;
-		}
-
-		m_check_Y = (packet_buf[6] >> 7);
-		buf_y = (packet_buf[9] & 0xff) | ((packet_buf[8] << 8) & 0xff00) | ((packet_buf[7] << 16) & 0xff0000) | ((packet_buf[6] << 24) & 0x7f000000);
-		if(m_check_Y == 0)
-		{
-			*y = 1.0 * (double)buf_y;
-		}
-		else
-		{
-			*y = -1.0 * (double)buf_y;
-		}
-
-		uint16_t raw_theta = (packet_buf[11] & 0xff) | ((packet_buf[10] << 8) & 0xff00);
-		*theta = (double)raw_theta;
+		parse_velocity2_pose(packet_buf, x, y, theta);
 
 		// new Velocity add... 
 		uint16_t raw_velocity_l = (packet_buf[13] & 0xff) | ((packet_buf[12] << 8) & 0x7f00);
