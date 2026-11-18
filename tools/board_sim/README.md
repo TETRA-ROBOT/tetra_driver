@@ -10,6 +10,7 @@
 | `test_wheel_driver.py` | 바퀴 드라이버 시나리오 14개 (아래) |
 | `test_wheel_driver_legacy_m.py` | 구형 M 구동보드 시나리오 10개: 16바이트 velocity2 응답에서 30Hz 유지, 명령이 끊기면 1초 안에 정지, 비상정지 버튼으로 서보 풀기·복귀, 비상정지를 구동보드 고장으로 알리지 않음 |
 | `test_power_driver.py` | 전원 드라이버 시나리오 11개 (아래) |
+| `test_raw_command.py` | 두 드라이버의 `~/raw_command` 시나리오 15개: 프로토콜 틀·응답 프레임, 폴링 중 연속 30·20회 보내도 폴링 응답과 섞이지 않음, 보낸 뒤 폴링 계속, 무응답·한도 초과 거부, 바퀴 주행 중 거부 |
 
 ## 실행
 
@@ -23,6 +24,7 @@ export ROS_DOMAIN_ID=77      # 다른 로봇·노드와 섞이지 않게
 python3 -P <tetra_driver>/tools/board_sim/test_wheel_driver.py
 python3 -P <tetra_driver>/tools/board_sim/test_wheel_driver_legacy_m.py
 python3 -P <tetra_driver>/tools/board_sim/test_power_driver.py
+python3 -P <tetra_driver>/tools/board_sim/test_raw_command.py
 ```
 
 노드 로그는 `$LOG_DIR`(기본 `/tmp`)의 `tetra_*_driver_test.log` 에 남습니다.

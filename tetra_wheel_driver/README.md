@@ -86,6 +86,7 @@ RS232 포트 설정과 패킷 읽기·쓰기는 `tetra_serial` 패키지(`tetra_
 - **`linear_move_cmd`** (타입: `interfaces/srv/LinearPositionMove`): 선형 위치 이동 명령을 실행합니다.
 - **`angular_move_cmd`** (타입: `interfaces/srv/AngularPositionMove`): 각도 위치 이동 명령을 실행합니다.
 - **`servo_cmd`** (타입: `interfaces/srv/Servo`): 서보 모터를 On/Off 제어합니다.
+- **`/tetra_wheel_driver/raw_command`** (타입: `interfaces/srv/BoardRawCommand`): 구동 보드에 임의 바이트를 보내고 응답을 그대로 받습니다 (관리자 "보드 명령 테스트"). 바퀴에 속도를 주는 중이면 거부합니다. 루트 `README.md` 의 "보드 명령 테스트" 참고.
 
 ## 사용 방법 예시
 1. Launch 파일 실행:

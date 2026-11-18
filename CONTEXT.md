@@ -9,8 +9,8 @@
 | 서브 패키지 | 주요 소스 | 역할 | 주요 통신 (Topic/Service) |
 |---|---|---|---|
 | `tetra_wheel_driver` | `tetra_wheel_driver.cpp`, `drive_module.c` | 좌/우 바퀴 모터 제어, Odometry 계산, TF 브로드캐스팅 | Sub: `cmd_vel_nav2`(Nav2 최종), `cmd_vel_manual`(조그) — `cmd_vel_nav` 는 기본 미구독<br>Pub: `/odom`, `/tf` |
-| `tetra_power_driver` | `tetra_power_driver.cpp`, `power_module.c` | 배터리, 충전 전류, 전압, Sonar 초음파, LED 제어, 비상정지(EMG), 범퍼 | Pub: `/tetra_battery`, `/tetra_power`, `/gpio_status`<br>Srv: `Power_outport_cmd`, `led_control` |
-| `tetra_serial` | `rs232.c`, `rs232_common.c` | 두 드라이버가 같이 쓰는 RS232 포트 설정·패킷 읽기/쓰기 (정적 라이브러리) | - |
+| `tetra_power_driver` | `tetra_power_driver.cpp`, `power_module.c` | 배터리, 충전 전류, 전압, Sonar 초음파, LED 제어, 비상정지(EMG), 범퍼 | Pub: `/tetra_battery`, `/tetra_power`, `/gpio_status`<br>Srv: `Power_outport_cmd`, `led_control`, `~/raw_command` |
+| `tetra_serial` | `rs232.c`, `rs232_common.c`, `rs232_raw.c` | 두 드라이버가 같이 쓰는 RS232 포트 설정·패킷 읽기/쓰기 (정적 라이브러리), raw 명령 주고받기 | - |
 
 ## 아키텍처 다이어그램
 
@@ -45,3 +45,6 @@
     뒤쪽 서보 버튼이 없는 구형 M 용이다. **`publish_odom_covariance`** (기본 false, M 런치는 true): `/odom` 에 공분산을 싣는다. `ekf_m.yaml` 이 이 값에 맞춰져 있다
     (주행 중 회전 분산 1e-6 으로 바퀴가 방향을 잡고 IMU 는 바퀴가 끊길 때 대신한다. 근거는 `FillOdometryCovariance` 주석).
     구형 보드와 비상정지 동작은 `tools/board_sim/test_wheel_driver_legacy_m.py` 로 확인한다.
+11. **`~/raw_command`** (`/tetra_wheel_driver/raw_command`, `/tetra_power_driver/raw_command`, `interfaces/srv/BoardRawCommand`): 관리자 "보드 명령 테스트"가 보드에 임의 바이트를 보낸다.
+    폴링 루프와 같은 스레드(spin_some)에서 처리해야 패킷이 섞이지 않는다 — 드라이버를 멀티스레드 실행기로 바꾸면 시리얼 접근에 잠금을 따로 둬야 한다.
+    응답을 기다리는 동안 폴링이 멈추므로 한도(256 바이트, 2초)를 늘리지 않는다. 자세한 내용은 `README.md` "보드 명령 테스트".

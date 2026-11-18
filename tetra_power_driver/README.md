@@ -67,6 +67,7 @@ RS232 포트 설정과 패킷 읽기·쓰기는 `tetra_serial` 패키지(`tetra_
 - **`/Power_data_read_cmd`**: 전원 데이터를 읽습니다.
 - **`/Power_adc_read_cmd`**: ADC 데이터를 읽습니다.
 - **`/Power_version_read_cmd`**: 전원 모듈의 버전을 읽습니다.
+- **`/tetra_power_driver/raw_command`** (`interfaces/srv/BoardRawCommand`): 전원 보드에 임의 바이트를 보내고 응답을 그대로 받습니다 (관리자 "보드 명령 테스트"). 루트 `README.md` 의 "보드 명령 테스트" 참고.
 
 ### 초음파(Ultrasonic) 옵션 서비스
 - **`/Power_sonar_read_cmd`**: 초음파 데이터를 읽습니다.
