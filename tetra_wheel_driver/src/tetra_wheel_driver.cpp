@@ -20,6 +20,8 @@
 #include "interfaces/srv/servo.hpp"
 // 버전 응답 필드(보드 종류·날짜·버전)가 같아 전원 보드용 타입을 함께 쓴다
 #include "interfaces/srv/power_version_read.hpp"
+#include "interfaces/srv/board_raw_command.hpp"
+#include "tetra_serial/raw_command_service.hpp"
 
 #ifdef __cplusplus
 extern "C"
@@ -381,6 +383,11 @@ public:
 		servo_srv = create_service<interfaces::srv::Servo>(
         	"servo_cmd", 
 			std::bind(&TETRAWheelDriver::Servo_Command, this, std::placeholders::_1, std::placeholders::_2));
+
+		// 관리자 "보드 명령 테스트". 다른 서비스와 달리 노드 이름 아래(/tetra_wheel_driver/raw_command)에 둬 전원 보드 것과 구분한다
+		raw_command_srv = create_service<interfaces::srv::BoardRawCommand>(
+			"~/raw_command",
+			std::bind(&TETRAWheelDriver::Raw_Command, this, std::placeholders::_1, std::placeholders::_2));
 	}
 
 	rclcpp::Time current_time, last_time;
@@ -807,6 +814,18 @@ private:
 	rclcpp::Service<interfaces::srv::LinearPositionMove>::SharedPtr linear_position_move_srv;
 	rclcpp::Service<interfaces::srv::AngularPositionMove>::SharedPtr angular_position_move_srv;
 	rclcpp::Service<interfaces::srv::Servo>::SharedPtr servo_srv;
+	rclcpp::Service<interfaces::srv::BoardRawCommand>::SharedPtr raw_command_srv;
+
+	// spin_some 으로 폴링 루프 안에서 불리므로 폴링 패킷과 섞이지 않는다 (tetra_serial/raw_command_service.hpp).
+	// 바퀴에 속도를 주는 중이면 거부한다: 응답을 기다리는 동안(최대 2초) 속도 명령이 나가지 않아 마지막 속도로 계속 간다
+	void Raw_Command(const std::shared_ptr<interfaces::srv::BoardRawCommand::Request> request, const std::shared_ptr<interfaces::srv::BoardRawCommand::Response> response)
+	{
+		const bool wheels_idle = linear == 0.0 && angular == 0.0 && control_linear == 0.0 && control_angular == 0.0;
+		tetra_serial::HandleRawCommand(*request, *response, dssp_rs232_drv_module_raw_exchange,
+			wheels_idle, "wheels are being driven; stop the robot first");
+		RCLCPP_WARN(this->get_logger(), "raw_command: %zu bytes sent, %zu bytes received, %s",
+			response->sent.size(), response->reply.size(), response->message.c_str());
+	}
 
 	// 응답 문자열 "12605130" = 보드 종류 1, 2026-05-13, 버전 0 → 필드마다 숫자 한 자리씩 담는다
 	bool Drive_Version_Read_Command(const std::shared_ptr<interfaces::srv::PowerVersionRead::Request> request, const std::shared_ptr<interfaces::srv::PowerVersionRead::Response> response)

@@ -50,6 +50,8 @@
 #include "interfaces/srv/conveyor_data_read.hpp"
 #include "interfaces/srv/power_sonar_read.hpp"
 #include "interfaces/srv/power_sonar_cmd.hpp"
+#include "interfaces/srv/board_raw_command.hpp"
+#include "tetra_serial/raw_command_service.hpp"
 
 // RS232 Power Module Driver
 #ifdef __cplusplus
@@ -330,6 +332,11 @@ public:
 		power_sonar_cmd_srv = create_service<interfaces::srv::PowerSonarCmd>(
         	"Power_sonar_start_cmd", 
 			std::bind(&TETRAPowerDriver::Power_Sonar_Command, this, std::placeholders::_1, std::placeholders::_2));
+
+		// 관리자 "보드 명령 테스트". 노드 이름 아래(/tetra_power_driver/raw_command)에 둬 구동 보드 것과 구분한다
+		raw_command_srv = create_service<interfaces::srv::BoardRawCommand>(
+			"~/raw_command",
+			std::bind(&TETRAPowerDriver::Raw_Command, this, std::placeholders::_1, std::placeholders::_2));
 	}
 
 	rclcpp::Time current_time, last_time;
@@ -757,6 +764,14 @@ public:
 		return true;
 	}
 
+	// spin_some 으로 폴링 루프 안에서 불리므로 배터리·GPIO 폴링 패킷과 섞이지 않는다 (tetra_serial/raw_command_service.hpp)
+	void Raw_Command(const std::shared_ptr<interfaces::srv::BoardRawCommand::Request> request, const std::shared_ptr<interfaces::srv::BoardRawCommand::Response> response)
+	{
+		tetra_serial::HandleRawCommand(*request, *response, dssp_rs232_power_module_raw_exchange);
+		RCLCPP_WARN(this->get_logger(), "raw_command: %zu bytes sent, %zu bytes received, %s",
+			response->sent.size(), response->reply.size(), response->message.c_str());
+	}
+
 private:
 	rclcpp::Service<interfaces::srv::LedControl>::SharedPtr led_control_srv;
 	rclcpp::Service<interfaces::srv::LedToggleControl>::SharedPtr led_toggle_control_srv;
@@ -780,6 +795,7 @@ private:
 	rclcpp::Service<interfaces::srv::ConveyorDataRead>::SharedPtr conveyor_data_read_srv;
 	rclcpp::Service<interfaces::srv::PowerSonarRead>::SharedPtr power_sonar_read_srv;
 	rclcpp::Service<interfaces::srv::PowerSonarCmd>::SharedPtr power_sonar_cmd_srv;
+	rclcpp::Service<interfaces::srv::BoardRawCommand>::SharedPtr raw_command_srv;
 };
 
 // 전원 보드를 이만큼 연속으로 읽지 못하면 끊긴 것으로 본다 (한 번 읽는 데 최대 0.2초라 약 0.7초).

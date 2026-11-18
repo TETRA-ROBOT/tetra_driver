@@ -4,6 +4,7 @@
 #include "tetra_serial/rs232.h"
 #include "dssp_rs232_power_module.h"
 #include "power_module.h"
+#include "tetra_serial/rs232_raw.h"
 
 // 열린 포트가 없으면 -1. open() 은 실패 시 -1 을 돌려주므로 0 으로 판단하면 실패를 성공으로 본다
 int _power = -1;
@@ -375,4 +376,11 @@ int  dssp_rs232_power_cmd(const char* cmd_str, char* out_str)
 	ret = flexible_command(_power, cmd_str, out_str);
 
 	return ret;
+}
+
+/* 관리자 "보드 명령 테스트" (~/raw_command). 폴링 루프와 같은 스레드(spin_some 콜백)에서만 부른다 */
+int dssp_rs232_power_module_raw_exchange(const unsigned char *tx, int tx_length, unsigned char *reply, size_t reply_size,
+	int timeout_ms, int read_mode, int *frame_status)
+{
+	return raw_exchange(_power, tx, tx_length, reply, reply_size, timeout_ms, read_mode, frame_status);
 }

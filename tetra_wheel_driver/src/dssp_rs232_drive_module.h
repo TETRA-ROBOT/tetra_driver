@@ -1,3 +1,4 @@
+#include <stddef.h>
 
 int  dssp_rs232_drv_module_create(const char *device, int time_out);
 void dssp_rs232_drv_module_destroy();
@@ -17,3 +18,5 @@ int  dssp_rs232_drv_module_set_velocitymode();
 int  dssp_rs232_drv_module_set_positionmode();
 int  dssp_rs232_drv_module_set_charge(int mode);
 int  dssp_rs232_drv_module_set_velocity2(int velocity_l, int velocity_r, double *Xpos_mm, double *Ypos_mm, double *deg, double *vel_l, double *vel_r, int *bumper, int *emg);
+int  dssp_rs232_drv_module_raw_exchange(const unsigned char *tx, int tx_length, unsigned char *reply, size_t reply_size,
+	int timeout_ms, int read_mode, int *frame_status);

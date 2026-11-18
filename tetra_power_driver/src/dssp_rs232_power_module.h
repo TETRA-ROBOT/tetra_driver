@@ -1,3 +1,4 @@
+#include <stddef.h>
 int  dssp_rs232_power_module_create(const char *device, int time_out);
 void dssp_rs232_power_module_destroy();
 int  dssp_rs232_power_module_read_battery(double *dbattery, double *dVoltage, double *dCurrent, int *mode_status, int *Input, int *Output);
@@ -48,3 +49,5 @@ int  dssp_rs232_power_module_read_conveyor_movement(int* result);
 
 int  dssp_rs232_power_module_read_motor_position(int* result);
 int  dssp_rs232_power_cmd(const char* cmd_str, char* out_str);
+int  dssp_rs232_power_module_raw_exchange(const unsigned char *tx, int tx_length, unsigned char *reply, size_t reply_size,
+	int timeout_ms, int read_mode, int *frame_status);
