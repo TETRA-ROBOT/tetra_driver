@@ -1,5 +1,5 @@
 <launch>
   <node pkg="tetra_wheel_driver" exec="tetra_wheel_driver" name="tetra_wheel_driver" output="screen" >
-    <param name="m_bEKF_option" value="false"/> <!--default: false-->
+    <param name="ekf_option" value="false"/> <!--default: false-->
   </node>
 </launch>

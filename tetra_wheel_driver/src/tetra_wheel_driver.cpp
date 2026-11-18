@@ -22,6 +22,7 @@
 #include "interfaces/srv/power_version_read.hpp"
 #include "interfaces/srv/board_raw_command.hpp"
 #include "tetra_serial/raw_command_service.hpp"
+#include "tetra_serial/renamed_parameter.hpp"
 
 #ifdef __cplusplus
 extern "C"
@@ -248,7 +249,6 @@ public:
 		// Declare parameters
 		this->declare_parameter("robot_model", "m");
 		this->declare_parameter("port", "/dev/ttyS0");
-		this->declare_parameter("m_bEKF_option", false);
 		this->declare_parameter("wheel_radius", 0.0);
 		this->declare_parameter("wheel_distance", 0.0);
 		this->declare_parameter("tread_width", 0.0);
@@ -271,7 +271,7 @@ public:
 		std::string robot_model = this->get_parameter("robot_model").as_string();
 		std::string port_str = this->get_parameter("port").as_string();
 		strncpy(port, port_str.c_str(), sizeof(port) - 1);
-		m_bEKF_option = this->get_parameter("m_bEKF_option").as_bool();
+		m_bEKF_option = tetra_serial::DeclareRenamedBool(*this, "ekf_option", "m_bEKF_option", false);
 		m_dCmdVelTimeout = this->get_parameter("cmd_vel_timeout").as_double();
 		const bool use_raw_nav_cmd = this->get_parameter("use_raw_nav_cmd").as_bool();
 		emg_releases_servo_ = this->get_parameter("emg_releases_servo").as_bool();

@@ -26,7 +26,7 @@ def check(name, ok, detail=''):
 board = FakeDriveBoard()
 exe = os.path.join(WS, 'install/tetra_wheel_driver/lib/tetra_wheel_driver/tetra_wheel_driver')
 proc = subprocess.Popen([exe, '--ros-args', '-p', f'port:={board.path}', '-p', 'robot_model:=m',
-                         '-p', 'm_bEKF_option:=true'],
+                         '-p', 'ekf_option:=true'],
                         stdout=open(os.path.join(os.environ.get('LOG_DIR', '/tmp'), 'tetra_wheel_driver_test.log'), 'w'), stderr=subprocess.STDOUT)
 
 rclpy.init()

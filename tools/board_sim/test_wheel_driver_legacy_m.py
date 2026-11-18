@@ -28,7 +28,7 @@ board.legacy_frame = True
 exe = os.path.join(WS, 'install/tetra_wheel_driver/lib/tetra_wheel_driver/tetra_wheel_driver')
 log_path = os.path.join(os.environ.get('LOG_DIR', '/tmp'), 'tetra_wheel_driver_legacy_test.log')
 proc = subprocess.Popen([exe, '--ros-args', '-p', f'port:={board.path}', '-p', 'robot_model:=m',
-                         '-p', 'm_bEKF_option:=true', '-p', 'emg_releases_servo:=true'],
+                         '-p', 'ekf_option:=true', '-p', 'emg_releases_servo:=true'],
                         stdout=open(log_path, 'w'), stderr=subprocess.STDOUT)
 
 rclpy.init()

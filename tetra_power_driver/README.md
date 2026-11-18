@@ -36,9 +36,9 @@ RS232 포트 설정과 패킷 읽기·쓰기는 `tetra_serial` 패키지(`tetra_
 | 이름 | 기본값 | 설명 |
 |---|---|---|
 | `port` | `/dev/ttyS1` | 전원 보드 시리얼 포트 |
-| `m_bConveyor_option` | `false` | 컨베이어 센서·동작 상태 발행 |
-| `m_bUltrasonic_option` | `false` | 초음파 센서 켜기·발행 |
-| `ultrasonic_max_range` | `0.5` | 초음파 최대 거리(m). 보드 파라미터 `p5_sonar_max_distance`(mm, `/Power_parameter_read_cmd`)와 맞춥니다 |
+| `conveyor_option` | `false` | 컨베이어 센서·동작 상태 발행 (예전 이름 `m_bConveyor_option` 도 읽지만 경고) |
+| `ultrasonic_option` | `false` | 초음파 센서 켜기·발행 (예전 이름 `m_bUltrasonic_option` 도 읽지만 경고) |
+| `ultrasonic_max_range` | `0.5` | 초음파 최대 거리(m). 보드 파라미터 `p5_sonar_max_distance`(mm, `/power_parameter_read_cmd`)와 맞춥니다 |
 
 ## 통신 오류 처리
 - 모든 서비스의 `command_result` 는 보드 응답 결과입니다. 응답이 없거나 깨지면 `false` 이고, 값은 쓰지 마세요.
@@ -51,39 +51,41 @@ RS232 포트 설정과 패킷 읽기·쓰기는 `tetra_serial` 패키지(`tetra_
 - **`tetra_power_driver`**: 전원 보드 하드웨어와 통신하며, 전원/배터리/센서 데이터 및 제어 명령을 처리합니다.
 
 ## 주요 서비스
+서비스 이름은 소문자다. 예전 대문자 이름(`/Power_outport_cmd`, `/Conveyor_auto_move_cmd` 등)도 같은 동작으로 열려 있지만, 새 코드는 소문자 이름을 쓴다.
+
 ### 기본 서비스
 - **`/led_cmd`**: LED를 제어합니다.
 - **`/led_toggle_cmd`**: LED의 토글 상태를 제어합니다.
-- **`/turn_on_cmd`**: 특정 장치를 활성화합니다.
+- **`/turn_on_cmd`**: 보드 LT 명령. LED 색 채널을 켭니다 (리프트 명령이 아닙니다).
 - **`/log_cmd`**: 통합 로그 데이터를 처리합니다.
-- **`/Power_outport_cmd`**: 출력 포트를 설정합니다.
-- **`/Power_io_status_cmd`**: IO 상태를 읽습니다.
-- **`/Power_enable_cmd`**: 출력 포트를 활성화합니다.
-- **`/Power_single_outport_cmd`**: 단일 출력 포트를 설정합니다.
-- **`/Power_single_enable_cmd`**: 단일 출력 포트를 활성화합니다.
-- **`/Power_wheel_enable_cmd`**: 휠 전원을 활성화합니다.
-- **`/Power_parameter_read_cmd`**: 파라미터를 읽습니다.
-- **`/Power_parameter_write_cmd`**: 파라미터를 설정합니다.
-- **`/Power_data_read_cmd`**: 전원 데이터를 읽습니다.
-- **`/Power_adc_read_cmd`**: ADC 데이터를 읽습니다.
-- **`/Power_version_read_cmd`**: 전원 모듈의 버전을 읽습니다.
+- **`/power_outport_cmd`**: 출력 포트를 설정합니다.
+- **`/power_io_status_cmd`**: IO 상태를 읽습니다.
+- **`/power_enable_cmd`**: 출력 포트를 활성화합니다.
+- **`/power_single_outport_cmd`**: 단일 출력 포트를 설정합니다.
+- **`/power_single_enable_cmd`**: 단일 출력 포트를 활성화합니다.
+- **`/power_wheel_enable_cmd`**: 휠 전원을 활성화합니다.
+- **`/power_parameter_read_cmd`**: 파라미터를 읽습니다.
+- **`/power_parameter_write_cmd`**: 파라미터를 설정합니다.
+- **`/power_data_read_cmd`**: 전원 데이터를 읽습니다.
+- **`/power_adc_read_cmd`**: ADC 데이터를 읽습니다.
+- **`/power_version_read_cmd`**: 전원 모듈의 버전을 읽습니다.
 - **`/tetra_power_driver/raw_command`** (`interfaces/srv/BoardRawCommand`): 전원 보드에 임의 바이트를 보내고 응답을 그대로 받습니다 (관리자 "보드 명령 테스트"). 루트 `README.md` 의 "보드 명령 테스트" 참고.
 
 ### 초음파(Ultrasonic) 옵션 서비스
-- **`/Power_sonar_read_cmd`**: 초음파 데이터를 읽습니다.
-- **`/Power_sonar_start_cmd`**: 초음파 명령을 설정합니다.
+- **`/power_sonar_read_cmd`**: 초음파 데이터를 읽습니다.
+- **`/power_sonar_start_cmd`**: 초음파 명령을 설정합니다.
 
 ### 컨베이어(Conveyor) 옵션 서비스
-- **`/Conveyor_parameter_read_cmd`**: 컨베이어 파라미터를 읽습니다.
-- **`/Conveyor_auto_move_cmd`**: 컨베이어의 자동 이동을 제어합니다.
-- **`/Conveyor_manual_move_cmd`**: 컨베이어의 수동 이동을 제어합니다.
-- **`/Conveyor_parameter_write_cmd`**: 컨베이어 파라미터를 설정합니다.
-- **`/Conveyor_data_read_cmd`**: 컨베이어 데이터를 읽습니다.
+- **`/conveyor_parameter_read_cmd`**: 컨베이어 파라미터를 읽습니다.
+- **`/conveyor_auto_move_cmd`**: 보드 CN 명령. **리프트**를 움직입니다 (H: 0 원점·1 중간·2 최대, M 리프트 컨베이어: 0 내림·1 올림).
+- **`/conveyor_manual_move_cmd`**: 보드 CC 명령. 컨베이어를 돌립니다 (0 정지·1 정회전·2 역회전).
+- **`/conveyor_parameter_write_cmd`**: 컨베이어 파라미터를 설정합니다.
+- **`/conveyor_data_read_cmd`**: 컨베이어 데이터를 읽습니다.
 
 ## 추가 옵션
 ### 초음파(Ultrasonic) 옵션
 - 초음파 센서를 통해 최대 8개의 거리 데이터를 수집할 수 있습니다.
-- 초음파 데이터는 `sensor_msgs/msg/Range` 메시지 형식으로 퍼블리시되거나 PointCloud2 데이터로 변환될 수 있습니다.
+- 초음파 데이터는 `ultrasonic_dl`·`ultrasonic_rl`·`ultrasonic_rr`·`ultrasonic_dr`(`sensor_msgs/msg/Range`)와 `range_points_dl` 등(PointCloud2)으로 발행합니다. 예전 이름은 `Ultrasonic_D_L`, `range_points_DL` 이었습니다.
 - 보드는 감지가 없으면 최대 거리 값을 보냅니다. `ultrasonic_max_range` 이상(과 0)은 "감지 없음"으로 보고 `Range` 는 최대 거리로, `range_points_*` 는 빈 점군으로 발행합니다.
 
 ### 컨베이어(Conveyor) 옵션
@@ -97,13 +99,13 @@ RS232 포트 설정과 패킷 읽기·쓰기는 `tetra_serial` 패키지(`tetra_
    ```
 2. 서비스 호출 예시:
    ```bash
-   ros2 service call /Power_outport_cmd interfaces/srv/PowerSetOutport "{id: 1, value: 100}"
+   ros2 service call /power_outport_cmd interfaces/srv/PowerSetOutport "{id: 1, value: 100}"
    ```
 3. 초음파 데이터를 읽으려면:
    ```bash
-   ros2 service call /Power_sonar_read_cmd interfaces/srv/PowerSonarRead "{}"
+   ros2 service call /power_sonar_read_cmd interfaces/srv/PowerSonarRead "{}"
    ```
 4. 컨베이어를 수동으로 이동하려면:
    ```bash
-   ros2 service call /Conveyor_manual_move_cmd interfaces/srv/ConveyorManualMovement "{direction: 'forward', speed: 50}"
+   ros2 service call /conveyor_manual_move_cmd interfaces/srv/ConveyorManualMovement "{mode: 1}"
    ```

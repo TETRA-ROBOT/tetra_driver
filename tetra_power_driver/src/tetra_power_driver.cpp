@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <array>
+#include <vector>
 #include <atomic>
 #include <memory>
 #include <string>
@@ -52,6 +53,7 @@
 #include "interfaces/srv/power_sonar_cmd.hpp"
 #include "interfaces/srv/board_raw_command.hpp"
 #include "tetra_serial/raw_command_service.hpp"
+#include "tetra_serial/renamed_parameter.hpp"
 
 // RS232 Power Module Driver
 #ifdef __cplusplus
@@ -140,10 +142,10 @@ struct SonarChannel
 };
 constexpr size_t kSonarCount = 4;
 constexpr SonarChannel kSonarChannels[kSonarCount] = {
-	{"sonar_DL", "Ultrasonic_D_L", "range_points_DL"},
-	{"sonar_RL", "Ultrasonic_R_L", "range_points_RL"},
-	{"sonar_RR", "Ultrasonic_R_R", "range_points_RR"},
-	{"sonar_DR", "Ultrasonic_D_R", "range_points_DR"},
+	{"sonar_DL", "ultrasonic_dl", "range_points_dl"},
+	{"sonar_RL", "ultrasonic_rl", "range_points_rl"},
+	{"sonar_RR", "ultrasonic_rr", "range_points_rr"},
+	{"sonar_DR", "ultrasonic_dr", "range_points_dr"},
 };
 std::array<sensor_msgs::msg::Range, kSonarCount> range_msgs;
 
@@ -209,14 +211,12 @@ public:
 	{
 		// Declare and get parameters
 		this->declare_parameter("port", "/dev/ttyS1");
-		this->declare_parameter("m_bConveyor_option", false);
-		this->declare_parameter("m_bUltrasonic_option", false);
 		this->declare_parameter("ultrasonic_max_range", 0.5);
 
 		std::string port_param = this->get_parameter("port").as_string();
 		strncpy(port, port_param.c_str(), sizeof(port) - 1);
-		m_bConveyor_option = this->get_parameter("m_bConveyor_option").as_bool();
-		m_bUltrasonic_option = this->get_parameter("m_bUltrasonic_option").as_bool();
+		m_bConveyor_option = tetra_serial::DeclareRenamedBool(*this, "conveyor_option", "m_bConveyor_option", false);
+		m_bUltrasonic_option = tetra_serial::DeclareRenamedBool(*this, "ultrasonic_option", "m_bUltrasonic_option", false);
 		m_dUltrasonicMaxRange = this->get_parameter("ultrasonic_max_range").as_double();
 
 		// Publishers
@@ -244,7 +244,7 @@ public:
 		conveyor_sensor_publisher = this->create_publisher<std_msgs::msg::Int32>("conveyor_sensor", 1);
 		conveyor_movement_publisher = this->create_publisher<std_msgs::msg::Int32>("conveyor_movement", 1);
 
-		// Services
+		// Services. Power_*·Conveyor_* 는 예전 대문자 이름도 같이 연다 (legacy_services_). 새 코드는 소문자 이름을 쓴다
 		led_control_srv = create_service<interfaces::srv::LedControl>(
         	"led_cmd", 
 			std::bind(&TETRAPowerDriver::LED_Control_Command, this, std::placeholders::_1, std::placeholders::_2));
@@ -262,76 +262,94 @@ public:
 			std::bind(&TETRAPowerDriver::Integrallog_Command, this, std::placeholders::_1, std::placeholders::_2));
 
 		power_set_outport_srv = create_service<interfaces::srv::PowerSetOutport>(
-        	"Power_outport_cmd", 
+        	"power_outport_cmd", 
 			std::bind(&TETRAPowerDriver::Power_Set_Outport_Command, this, std::placeholders::_1, std::placeholders::_2));
+		legacy_services_.push_back(create_service<interfaces::srv::PowerSetOutport>("Power_outport_cmd", std::bind(&TETRAPowerDriver::Power_Set_Outport_Command, this, std::placeholders::_1, std::placeholders::_2)));
 
 		power_set_single_outport_srv = create_service<interfaces::srv::PowerSetSingleOutport>(
-        	"Power_single_outport_cmd", 
+        	"power_single_outport_cmd", 
 			std::bind(&TETRAPowerDriver::Power_Set_Single_Outport_Command, this, std::placeholders::_1, std::placeholders::_2));
+		legacy_services_.push_back(create_service<interfaces::srv::PowerSetSingleOutport>("Power_single_outport_cmd", std::bind(&TETRAPowerDriver::Power_Set_Single_Outport_Command, this, std::placeholders::_1, std::placeholders::_2)));
 
 		power_get_io_status_srv = create_service<interfaces::srv::PowerGetIoStatus>(
-        	"Power_io_status_cmd", 
+        	"power_io_status_cmd", 
 			std::bind(&TETRAPowerDriver::Power_Get_IO_Status_Command, this, std::placeholders::_1, std::placeholders::_2));
+		legacy_services_.push_back(create_service<interfaces::srv::PowerGetIoStatus>("Power_io_status_cmd", std::bind(&TETRAPowerDriver::Power_Get_IO_Status_Command, this, std::placeholders::_1, std::placeholders::_2)));
 
 		power_set_enable_srv = create_service<interfaces::srv::PowerSetEnable>(
-        	"Power_enable_cmd", 
+        	"power_enable_cmd", 
 			std::bind(&TETRAPowerDriver::Power_Set_Enable_Command, this, std::placeholders::_1, std::placeholders::_2));
+		legacy_services_.push_back(create_service<interfaces::srv::PowerSetEnable>("Power_enable_cmd", std::bind(&TETRAPowerDriver::Power_Set_Enable_Command, this, std::placeholders::_1, std::placeholders::_2)));
 
 		power_set_single_enable_srv = create_service<interfaces::srv::PowerSetSingleEnable>(
-        	"Power_single_enable_cmd", 
+        	"power_single_enable_cmd", 
 			std::bind(&TETRAPowerDriver::Power_Set_Single_Enable_Command, this, std::placeholders::_1, std::placeholders::_2));
+		legacy_services_.push_back(create_service<interfaces::srv::PowerSetSingleEnable>("Power_single_enable_cmd", std::bind(&TETRAPowerDriver::Power_Set_Single_Enable_Command, this, std::placeholders::_1, std::placeholders::_2)));
 
 		power_wheel_enable_srv = create_service<interfaces::srv::PowerWheelEnable>(
-        	"Power_wheel_enable_cmd", 
+        	"power_wheel_enable_cmd", 
 			std::bind(&TETRAPowerDriver::Power_Wheel_Enable_Command, this, std::placeholders::_1, std::placeholders::_2));
+		legacy_services_.push_back(create_service<interfaces::srv::PowerWheelEnable>("Power_wheel_enable_cmd", std::bind(&TETRAPowerDriver::Power_Wheel_Enable_Command, this, std::placeholders::_1, std::placeholders::_2)));
 
 		power_parameter_read_srv = create_service<interfaces::srv::PowerParameterRead>(
-        	"Power_parameter_read_cmd", 
+        	"power_parameter_read_cmd", 
 			std::bind(&TETRAPowerDriver::Power_Paramter_Read_Command, this, std::placeholders::_1, std::placeholders::_2));
+		legacy_services_.push_back(create_service<interfaces::srv::PowerParameterRead>("Power_parameter_read_cmd", std::bind(&TETRAPowerDriver::Power_Paramter_Read_Command, this, std::placeholders::_1, std::placeholders::_2)));
 
 		power_parameter_write_srv = create_service<interfaces::srv::PowerParameterWrite>(
-        	"Power_parameter_write_cmd", 
+        	"power_parameter_write_cmd", 
 			std::bind(&TETRAPowerDriver::Power_Paramter_Write_Command, this, std::placeholders::_1, std::placeholders::_2));
+		legacy_services_.push_back(create_service<interfaces::srv::PowerParameterWrite>("Power_parameter_write_cmd", std::bind(&TETRAPowerDriver::Power_Paramter_Write_Command, this, std::placeholders::_1, std::placeholders::_2)));
 
 		power_data_read_srv = create_service<interfaces::srv::PowerDataRead>(
-        	"Power_data_read_cmd", 
+        	"power_data_read_cmd", 
 			std::bind(&TETRAPowerDriver::Power_Data_Read_Command, this, std::placeholders::_1, std::placeholders::_2));
+		legacy_services_.push_back(create_service<interfaces::srv::PowerDataRead>("Power_data_read_cmd", std::bind(&TETRAPowerDriver::Power_Data_Read_Command, this, std::placeholders::_1, std::placeholders::_2)));
 
 		power_adc_read_srv = create_service<interfaces::srv::PowerAdcRead>(
-        	"Power_adc_read_cmd", 
+        	"power_adc_read_cmd", 
 			std::bind(&TETRAPowerDriver::Power_ADC_Read_Command, this, std::placeholders::_1, std::placeholders::_2));
+		legacy_services_.push_back(create_service<interfaces::srv::PowerAdcRead>("Power_adc_read_cmd", std::bind(&TETRAPowerDriver::Power_ADC_Read_Command, this, std::placeholders::_1, std::placeholders::_2)));
 
 		power_version_read_srv = create_service<interfaces::srv::PowerVersionRead>(
-        	"Power_version_read_cmd", 
+        	"power_version_read_cmd", 
 			std::bind(&TETRAPowerDriver::Power_Version_Read_Command, this, std::placeholders::_1, std::placeholders::_2));
+		legacy_services_.push_back(create_service<interfaces::srv::PowerVersionRead>("Power_version_read_cmd", std::bind(&TETRAPowerDriver::Power_Version_Read_Command, this, std::placeholders::_1, std::placeholders::_2)));
 
 		conveyor_auto_movement_srv = create_service<interfaces::srv::ConveyorAutoMovement>(
-        	"Conveyor_auto_move_cmd", 
+        	"conveyor_auto_move_cmd", 
 			std::bind(&TETRAPowerDriver::Conveyor_Auto_Movement_Command, this, std::placeholders::_1, std::placeholders::_2));
+		legacy_services_.push_back(create_service<interfaces::srv::ConveyorAutoMovement>("Conveyor_auto_move_cmd", std::bind(&TETRAPowerDriver::Conveyor_Auto_Movement_Command, this, std::placeholders::_1, std::placeholders::_2)));
 
 		conveyor_manual_movement_srv = create_service<interfaces::srv::ConveyorManualMovement>(
-        	"Conveyor_manual_move_cmd", 
+        	"conveyor_manual_move_cmd", 
 			std::bind(&TETRAPowerDriver::Conveyor_Manual_Movement_Command, this, std::placeholders::_1, std::placeholders::_2));
+		legacy_services_.push_back(create_service<interfaces::srv::ConveyorManualMovement>("Conveyor_manual_move_cmd", std::bind(&TETRAPowerDriver::Conveyor_Manual_Movement_Command, this, std::placeholders::_1, std::placeholders::_2)));
 
 		conveyor_parameter_read_srv = create_service<interfaces::srv::ConveyorParameterRead>(
-        	"Conveyor_parameter_read_cmd", 
+        	"conveyor_parameter_read_cmd", 
 			std::bind(&TETRAPowerDriver::Conveyor_Parameter_Read_Command, this, std::placeholders::_1, std::placeholders::_2));
+		legacy_services_.push_back(create_service<interfaces::srv::ConveyorParameterRead>("Conveyor_parameter_read_cmd", std::bind(&TETRAPowerDriver::Conveyor_Parameter_Read_Command, this, std::placeholders::_1, std::placeholders::_2)));
 
 		conveyor_parameter_write_srv = create_service<interfaces::srv::ConveyorParameterWrite>(
-        	"Conveyor_parameter_write_cmd", 
+        	"conveyor_parameter_write_cmd", 
 			std::bind(&TETRAPowerDriver::Conveyor_Parameter_Write_Command, this, std::placeholders::_1, std::placeholders::_2));
+		legacy_services_.push_back(create_service<interfaces::srv::ConveyorParameterWrite>("Conveyor_parameter_write_cmd", std::bind(&TETRAPowerDriver::Conveyor_Parameter_Write_Command, this, std::placeholders::_1, std::placeholders::_2)));
 
 		conveyor_data_read_srv = create_service<interfaces::srv::ConveyorDataRead>(
-        	"Conveyor_data_read_cmd", 
+        	"conveyor_data_read_cmd", 
 			std::bind(&TETRAPowerDriver::Conveyor_Data_Read_Command, this, std::placeholders::_1, std::placeholders::_2));
+		legacy_services_.push_back(create_service<interfaces::srv::ConveyorDataRead>("Conveyor_data_read_cmd", std::bind(&TETRAPowerDriver::Conveyor_Data_Read_Command, this, std::placeholders::_1, std::placeholders::_2)));
 
 		power_sonar_read_srv = create_service<interfaces::srv::PowerSonarRead>(
-        	"Power_sonar_read_cmd", 
+        	"power_sonar_read_cmd", 
 			std::bind(&TETRAPowerDriver::Power_Sonar_Read_Command, this, std::placeholders::_1, std::placeholders::_2));
+		legacy_services_.push_back(create_service<interfaces::srv::PowerSonarRead>("Power_sonar_read_cmd", std::bind(&TETRAPowerDriver::Power_Sonar_Read_Command, this, std::placeholders::_1, std::placeholders::_2)));
 
 		power_sonar_cmd_srv = create_service<interfaces::srv::PowerSonarCmd>(
-        	"Power_sonar_start_cmd", 
+        	"power_sonar_start_cmd", 
 			std::bind(&TETRAPowerDriver::Power_Sonar_Command, this, std::placeholders::_1, std::placeholders::_2));
+		legacy_services_.push_back(create_service<interfaces::srv::PowerSonarCmd>("Power_sonar_start_cmd", std::bind(&TETRAPowerDriver::Power_Sonar_Command, this, std::placeholders::_1, std::placeholders::_2)));
 
 		// 관리자 "보드 명령 테스트". 노드 이름 아래(/tetra_power_driver/raw_command)에 둬 구동 보드 것과 구분한다
 		raw_command_srv = create_service<interfaces::srv::BoardRawCommand>(
@@ -697,8 +715,8 @@ public:
 		response->p16_unloading_start_delay = m_iParam16;
 		response->p17_unloading_end_delay = m_iParam17;
 		response->p18_express_quantity = m_iParam18;
-		response->p19_termianl_loading_base = m_iParam19;
-		response->p20_termianl_unloading_base = m_iParam20;
+		response->p19_terminal_loading_base = m_iParam19;
+		response->p20_terminal_unloading_base = m_iParam20;
 	
 		response->command_result = (iResult == 0);
 		return true;
@@ -775,6 +793,8 @@ public:
 private:
 	rclcpp::Service<interfaces::srv::LedControl>::SharedPtr led_control_srv;
 	rclcpp::Service<interfaces::srv::LedToggleControl>::SharedPtr led_toggle_control_srv;
+	// 예전 대문자 서비스 이름 (Power_outport_cmd 등). 다른 PC·예전 클라이언트가 옮겨 갈 때까지 둔다
+	std::vector<rclcpp::ServiceBase::SharedPtr> legacy_services_;
 	rclcpp::Service<interfaces::srv::ToggleOn>::SharedPtr toggle_on_srv;
 	rclcpp::Service<interfaces::srv::Integrallog>::SharedPtr integrallog_srv;
 	rclcpp::Service<interfaces::srv::PowerSetOutport>::SharedPtr power_set_outport_srv;

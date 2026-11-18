@@ -1,6 +1,6 @@
 <launch>
   <node pkg="tetra_power_driver" exec="tetra_power_driver" name="tetra_power_driver" output="screen" >
-    <param name="m_bConveyor_option" value="false"/>
-    <param name="m_bUltrasonic_option" value="false"/>
+    <param name="conveyor_option" value="false"/>
+    <param name="ultrasonic_option" value="false"/>
   </node>
 </launch>

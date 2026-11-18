@@ -26,7 +26,7 @@ def check(name, ok, detail=''):
 board = FakePowerBoard()
 exe = os.path.join(WS, 'install/tetra_power_driver/lib/tetra_power_driver/tetra_power_driver')
 node_log = os.path.join(os.environ.get('LOG_DIR', '/tmp'), 'tetra_power_driver_test.log')
-proc = subprocess.Popen([exe, '--ros-args', '-p', f'port:={board.path}', '-p', 'm_bUltrasonic_option:=true'],
+proc = subprocess.Popen([exe, '--ros-args', '-p', f'port:={board.path}', '-p', 'ultrasonic_option:=true'],
                         stdout=open(node_log, 'w'), stderr=subprocess.STDOUT)
 
 rclpy.init()
@@ -36,12 +36,12 @@ node.create_subscription(Int32, 'tetra_battery', lambda m: battery.append(m.data
 node.create_subscription(Int32, 'power_status', lambda m: power_status.append(m.data), 50)
 node.create_subscription(Int32, 'servo_on', lambda m: servo.append(m.data), 50)
 sonar_range, sonar_points = {}, {}
-for sonar_name, range_suffix in (('DL', 'D_L'), ('RL', 'R_L'), ('RR', 'R_R'), ('DR', 'D_R')):
-    node.create_subscription(Range, f'Ultrasonic_{range_suffix}',
+for sonar_name in ('DL', 'RL', 'RR', 'DR'):
+    node.create_subscription(Range, f'ultrasonic_{sonar_name.lower()}',
                              lambda m, k=sonar_name: sonar_range.__setitem__(k, m.range), 10)
-    node.create_subscription(PointCloud2, f'range_points_{sonar_name}',
+    node.create_subscription(PointCloud2, f'range_points_{sonar_name.lower()}',
                              lambda m, k=sonar_name: sonar_points.__setitem__(k, m.width), 10)
-data_cli = node.create_client(PowerDataRead, 'Power_data_read_cmd')
+data_cli = node.create_client(PowerDataRead, 'power_data_read_cmd')
 led_cli = node.create_client(LedControl, 'led_cmd')
 
 

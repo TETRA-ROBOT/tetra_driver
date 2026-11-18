@@ -43,7 +43,7 @@ RS232 포트 설정과 패킷 읽기·쓰기는 `tetra_serial` 패키지(`tetra_
 | `port` | `/dev/ttyS0` | 구동 보드 시리얼 포트 |
 | `robot_model` | `m` | 바퀴 반지름·간격을 고른다 (`m`, `h`, `edu`, `mh`, `s`, `sm`). **bringup 에서 꼭 넘겨야 합니다** |
 | `wheel_radius`, `wheel_distance`, `tread_width` | 0 (모델 값 사용) | 0 보다 크면 모델 값 대신 사용 |
-| `m_bEKF_option` | `false` | `true` 면 odom→base_footprint TF 를 내보내지 않음 (EKF 가 담당) |
+| `ekf_option` | `false` | (예전 이름 `m_bEKF_option` 도 읽지만 경고) `true` 면 odom→base_footprint TF 를 내보내지 않음 (EKF 가 담당) |
 | `cmd_vel_timeout` | 0.5 | 이 시간(초) 동안 속도 명령이 없으면 정지. 0 이하면 끔 |
 | `max_linear_velocity` | 2.0 | 선속도 상한 (m/s) |
 | `max_angular_velocity` | 2.0 | 각속도 상한 (rad/s) |

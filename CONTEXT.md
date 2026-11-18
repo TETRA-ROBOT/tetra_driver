@@ -9,7 +9,7 @@
 | 서브 패키지 | 주요 소스 | 역할 | 주요 통신 (Topic/Service) |
 |---|---|---|---|
 | `tetra_wheel_driver` | `tetra_wheel_driver.cpp`, `drive_module.c` | 좌/우 바퀴 모터 제어, Odometry 계산, TF 브로드캐스팅 | Sub: `cmd_vel_nav2`(Nav2 최종), `cmd_vel_manual`(조그) — `cmd_vel_nav` 는 기본 미구독<br>Pub: `/odom`, `/tf` |
-| `tetra_power_driver` | `tetra_power_driver.cpp`, `power_module.c` | 배터리, 충전 전류, 전압, Sonar 초음파, LED 제어, 비상정지(EMG), 범퍼 | Pub: `/tetra_battery`, `/tetra_power`, `/gpio_status`<br>Srv: `Power_outport_cmd`, `led_control`, `~/raw_command` |
+| `tetra_power_driver` | `tetra_power_driver.cpp`, `power_module.c` | 배터리, 충전 전류, 전압, Sonar 초음파, LED 제어, 비상정지(EMG), 범퍼 | Pub: `/tetra_battery`, `/tetra_power`, `/gpio_status`<br>Srv: `power_outport_cmd`, `led_cmd`, `conveyor_auto_move_cmd`(CN, 리프트), `~/raw_command` |
 | `tetra_serial` | `rs232.c`, `rs232_common.c`, `rs232_raw.c` | 두 드라이버가 같이 쓰는 RS232 포트 설정·패킷 읽기/쓰기 (정적 라이브러리), raw 명령 주고받기 | - |
 
 ## 아키텍처 다이어그램
@@ -48,3 +48,8 @@
 11. **`~/raw_command`** (`/tetra_wheel_driver/raw_command`, `/tetra_power_driver/raw_command`, `interfaces/srv/BoardRawCommand`): 관리자 "보드 명령 테스트"가 보드에 임의 바이트를 보낸다.
     폴링 루프와 같은 스레드(spin_some)에서 처리해야 패킷이 섞이지 않는다 — 드라이버를 멀티스레드 실행기로 바꾸면 시리얼 접근에 잠금을 따로 둬야 한다.
     응답을 기다리는 동안 폴링이 멈추므로 한도(256 바이트, 2초)를 늘리지 않는다. 자세한 내용은 `README.md` "보드 명령 테스트".
+12. **이름 규칙**: ROS 서비스·토픽·파라미터 이름은 소문자 스네이크 케이스다. 전원 드라이버는 예전 대문자 서비스 이름(`Power_*_cmd`, `Conveyor_*_cmd`)도
+    `legacy_services_` 로 같이 열고, 예전 파라미터 이름(`m_bConveyor_option`, `m_bUltrasonic_option`, `m_bEKF_option`)도 경고와 함께 읽는다
+    (`tetra_serial/renamed_parameter.hpp`). 새 코드와 런치 파일은 새 이름을 쓴다. `m_bSingle_TF_option` 은 외부 패키지 iahrs_driver 것이라 그대로다.
+13. **리프트와 컨베이어 명령**: 보드 CN(`conveyor_auto_move_cmd`)이 리프트, CC(`conveyor_manual_move_cmd`)가 컨베이어, LT(`turn_on_cmd`)는 LED 채널이다.
+    서비스 이름의 "conveyor" 는 예전 이름을 따른 것이다.

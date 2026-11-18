@@ -18,7 +18,7 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {"robot_model": LaunchConfiguration('robot_model')},
-            {"m_bEKF_option": False}
+            {"ekf_option": False}
         ]
     )
 

@@ -9,8 +9,8 @@ def generate_launch_description():
         executable='tetra_power_driver',
         output='screen',
         parameters=[
-            {"m_bConveyor_option": False},
-            {"m_bUltrasonic_option": False}
+            {"conveyor_option": False},
+            {"ultrasonic_option": False}
         ]
     )
 
