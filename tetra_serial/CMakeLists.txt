@@ -14,6 +14,7 @@ find_package(ament_cmake REQUIRED)
 add_library(${PROJECT_NAME} STATIC
   src/rs232.c
   src/rs232_common.c
+  src/rs232_raw.c
 )
 set_target_properties(${PROJECT_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(${PROJECT_NAME} PUBLIC
@@ -32,6 +33,8 @@ if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(test_rs232_common test/test_rs232_common.cpp)
   target_link_libraries(test_rs232_common ${PROJECT_NAME})
+  ament_add_gtest(test_rs232_raw test/test_rs232_raw.cpp)
+  target_link_libraries(test_rs232_raw ${PROJECT_NAME})
 endif()
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
