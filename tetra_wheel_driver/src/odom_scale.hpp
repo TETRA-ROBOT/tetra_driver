@@ -72,16 +72,20 @@ public:
 		board_prev_ = board;
 		scaled_ = board;
 		started_ = true;
+		diverged_ = false;
 	}
 
 	Pose2D Update(const Pose2D & board, const Scale & scale)
 	{
-		// 배율 1 이면 보드 값을 그대로 낸다 (예전과 같다). 기준을 계속 옮겨 두어 배율을 바꿔도 위치가 튀지 않는다
-		if(!started_ || scale.IsIdentity())
+		// 배율 1 이고 한 번도 보정한 적이 없으면 보드 값을 그대로 낸다 (예전과 같다). 기준을 계속 옮겨 두어 배율을 켜도 튀지 않는다.
+		// 한 번이라도 보정했으면 배율 1 로 돌아와도 보드 값으로 되돌리지 않고 이동량을 계속 더한다.
+		// 되돌리면 그동안 쌓인 차이(예: 1.05 로 50 m → 약 2.5 m)만큼 /odom 이 순간 이동한다.
+		if(!started_ || (scale.IsIdentity() && !diverged_))
 		{
 			Reset(board);
 			return scaled_;
 		}
+		if(!scale.IsIdentity()) diverged_ = true;
 		const double dx = board.x - board_prev_.x;
 		const double dy = board.y - board_prev_.y;
 		const double dtheta = NormalizeAngle(board.theta - board_prev_.theta);
@@ -102,5 +106,7 @@ private:
 	Pose2D board_prev_;
 	Pose2D scaled_;
 	bool started_ = false;
+	// 출력이 보드 값과 달라졌는가 (배율 1 이 아닌 값으로 적분한 적이 있음). Reset 하면 다시 같아진다
+	bool diverged_ = false;
 };
 }  // namespace odom_scale

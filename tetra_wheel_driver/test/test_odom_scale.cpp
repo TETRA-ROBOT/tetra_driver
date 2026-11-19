@@ -86,6 +86,41 @@ TEST(OdomScale, SwitchingScaleDoesNotJump)
 	EXPECT_DOUBLE_EQ(out.theta, board.theta);
 }
 
+TEST(OdomScale, SwitchingBackToIdentityDoesNotJump)
+{
+	// 배율 1.05 로 50 m 간 뒤 배율 1 로 돌아와도 보드 값(차이 2.5 m)으로 튀지 않고 이어서 더해야 한다
+	ScaledOdometry odom;
+	const Scale scaled{1.05, 1.0};
+	odom.Update(Pose2D{}, scaled);
+	Pose2D board;
+	const Pose2D before = DriveArc(odom, board, scaled, 50.0, 0.0, 1500);
+	board.x = 50.0;
+	EXPECT_NEAR(before.x, 52.5, 1e-6);
+	// (DriveArc 의 보드 값은 잘게 더한 것이라 50.0 과 반올림 오차만큼 다르다)
+	const Pose2D same = odom.Update(board, Scale{});
+	EXPECT_NEAR(same.x, before.x, 1e-9);
+	EXPECT_NEAR(same.y, before.y, 1e-9);
+	EXPECT_NEAR(same.theta, before.theta, 1e-12);
+	// 배율 1 로 1 m 더 가면 정확히 1 m 늘어난다
+	const Pose2D after = DriveArc(odom, board, Scale{}, 1.0, 0.0, 30);
+	EXPECT_NEAR(after.x, before.x + 1.0, 1e-9);
+	EXPECT_NEAR(after.y, before.y, 1e-9);
+}
+
+TEST(OdomScale, ResetAfterScalingPassesBoardThroughAgain)
+{
+	// 보드 리셋(재연결) 뒤에는 출력이 다시 보드와 같으므로 배율 1 이면 그대로 통과한다
+	ScaledOdometry odom;
+	odom.Update(Pose2D{}, Scale{1.1, 1.0});
+	DriveArc(odom, Pose2D{}, Scale{1.1, 1.0}, 1.0, 0.0, 30);
+	odom.Reset(Pose2D{});
+	const Pose2D board{0.7, 0.1, 0.2};
+	const Pose2D out = odom.Update(board, Scale{});
+	EXPECT_DOUBLE_EQ(out.x, board.x);
+	EXPECT_DOUBLE_EQ(out.y, board.y);
+	EXPECT_DOUBLE_EQ(out.theta, board.theta);
+}
+
 TEST(OdomScale, FileRoundTripAndRangeCheck)
 {
 	const std::string path = "/tmp/test_odom_scale_" + std::to_string(::getpid()) + ".txt";
