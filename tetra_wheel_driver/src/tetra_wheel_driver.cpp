@@ -48,6 +48,7 @@ extern "C"
 #include <condition_variable>
 #include <string>
 #include <algorithm>
+#include "odom_scale.hpp"
 
 using namespace std;
 using std::placeholders::_1;
@@ -64,6 +65,8 @@ char port[64] = {0,};
 
 // calc
 bool first = true;
+// 보드 오도메트리가 0 으로 돌아갔다 (pose_reset, 재연결). 보정 오도메트리도 보드 값에서 다시 시작한다
+bool odom_scale_restart = true;
 double prev_coordinates[3] = {0.0, };
 double coordinates[3] = {0.0, }; // x, y, theta
 double dt = 0.0;
@@ -324,6 +327,8 @@ public:
 		if(custom_wheel_radius > 0.0) m_dWheel_Radius = custom_wheel_radius;
 		if(custom_wheel_distance > 0.0) m_dWheel_Distance = custom_wheel_distance;
 		if(custom_tread_width > 0.0) m_dTread_Width = custom_tread_width;
+
+		SetupOdomScale();
 
 		RCLCPP_INFO(this->get_logger(), "TETRA Wheel Driver Initialized (Model: %s, Wheel Radius: %.4fm, Wheel Dist: %.4fm, EKF: %d)",
 			robot_model.c_str(), m_dWheel_Radius, m_dWheel_Distance, m_bEKF_option);
@@ -605,6 +610,67 @@ public:
 	rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr servo_on_subscriber;
 	rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr power_status_subscriber;
 
+	odom_scale::Scale odom_scale_;
+	odom_scale::ScaledOdometry scaled_odometry_;
+	std::string odom_scale_file_;
+	rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr odom_scale_callback_;
+
+	// 보드 오도메트리에 로봇별 보정 배율을 곱한다 (odom_scale.hpp). 관리자 화면의 보정이 파라미터로 바꾸고 여기서 파일에 남긴다
+	void SetupOdomScale()
+	{
+		const char* home = getenv("HOME");
+		odom_scale_file_ = this->declare_parameter("odom_scale_file", std::string(home ? home : "") + "/.config/tetra/wheel_odom_scale.txt");
+		if(!odom_scale_file_.empty() && odom_scale::Load(odom_scale_file_, odom_scale_))
+		{
+			RCLCPP_INFO(this->get_logger(), "바퀴 오도메트리 보정 배율: 직진 %.5f, 회전 %.5f (%s)",
+				odom_scale_.linear, odom_scale_.angular, odom_scale_file_.c_str());
+		}
+		this->declare_parameter("odom_linear_scale", odom_scale_.linear);
+		this->declare_parameter("odom_angular_scale", odom_scale_.angular);
+		odom_scale_callback_ = this->add_on_set_parameters_callback(
+			std::bind(&TETRAWheelDriver::OnOdomScaleParameters, this, std::placeholders::_1));
+	}
+
+	rcl_interfaces::msg::SetParametersResult OnOdomScaleParameters(const std::vector<rclcpp::Parameter> & parameters)
+	{
+		rcl_interfaces::msg::SetParametersResult result;
+		result.successful = true;
+		odom_scale::Scale next = odom_scale_;
+		for(const rclcpp::Parameter & parameter : parameters)
+		{
+			if(parameter.get_name() != "odom_linear_scale" && parameter.get_name() != "odom_angular_scale") continue;
+			const double value = parameter.as_double();
+			if(!odom_scale::IsValidScale(value))
+			{
+				result.successful = false;
+				result.reason = "배율은 0.8 ~ 1.2 사이여야 합니다";
+				return result;
+			}
+			(parameter.get_name() == "odom_linear_scale" ? next.linear : next.angular) = value;
+		}
+		if(next.linear == odom_scale_.linear && next.angular == odom_scale_.angular) return result;
+		odom_scale_ = next;
+		const bool saved = odom_scale_file_.empty() || odom_scale::Save(odom_scale_file_, odom_scale_);
+		RCLCPP_INFO(this->get_logger(), "바퀴 오도메트리 보정 배율을 바꿨습니다: 직진 %.5f, 회전 %.5f%s",
+			odom_scale_.linear, odom_scale_.angular, saved ? "" : " (파일에 저장하지 못해 다시 켜면 사라집니다)");
+		return result;
+	}
+
+	// 보드 좌표(x, y, θ)를 보정 배율을 곱한 좌표로 바꾼다
+	void ApplyOdomScale(double * pose)
+	{
+		const odom_scale::Pose2D board{pose[0], pose[1], pose[2]};
+		if(odom_scale_restart)
+		{
+			scaled_odometry_.Reset(board);
+			odom_scale_restart = false;
+		}
+		const odom_scale::Pose2D scaled = scaled_odometry_.Update(board, odom_scale_);
+		pose[0] = scaled.x;
+		pose[1] = scaled.y;
+		pose[2] = scaled.theta;
+	}
+
 	// Kinematics functions
 	double distance_to_wheelrotation(double wheel_diameter, double distance)
 	{
@@ -764,6 +830,7 @@ public:
 		if(Reset == 1)
 		{
 			dssp_rs232_drv_module_reset_odometry();
+			odom_scale_restart = true;
 			Reset = 0;
 		}
 	}
@@ -1128,12 +1195,14 @@ int main(int argc, char * argv[])
 						InitDriveBoard();
 						// 보드가 다시 켜졌다면 오도메트리가 0 부터 다시 시작하므로 속도 계산 기준을 새로 잡는다
 						first = true;
+						odom_scale_restart = true;
 					}
 				}
 			}
 			coordinates[0] = (m_dX_pos / 1000.0);
 			coordinates[1] = (m_dY_pos / 1000.0);
 			coordinates[2] = m_dTheta * (M_PI / 1800.0);
+			if(odometry_ok) node->ApplyOdomScale(coordinates);
 
 			if(node->IsServoReleasedByEmergencyStop())
 			{

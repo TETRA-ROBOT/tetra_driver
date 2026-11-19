@@ -24,9 +24,13 @@ def check(name, ok, detail=''):
 
 
 board = FakeDriveBoard()
+# 이 PC 의 ~/.config/tetra 보정 배율을 읽지 않게 시험용 파일을 쓴다
+SCALE_FILE = os.path.join(os.environ.get('LOG_DIR', '/tmp'), f'wheel_odom_scale_test_{os.getpid()}.txt')
+if os.path.exists(SCALE_FILE):
+    os.remove(SCALE_FILE)
 exe = os.path.join(WS, 'install/tetra_wheel_driver/lib/tetra_wheel_driver/tetra_wheel_driver')
 proc = subprocess.Popen([exe, '--ros-args', '-p', f'port:={board.path}', '-p', 'robot_model:=m',
-                         '-p', 'ekf_option:=true'],
+                         '-p', 'ekf_option:=true', '-p', f'odom_scale_file:={SCALE_FILE}'],
                         stdout=open(os.path.join(os.environ.get('LOG_DIR', '/tmp'), 'tetra_wheel_driver_test.log'), 'w'), stderr=subprocess.STDOUT)
 
 rclpy.init()
@@ -145,6 +149,30 @@ spin_for(1.5)
 spin_for(2.0, send(0.2, 0.0, nav_raw_cmd))
 check('ignores raw cmd_vel_nav (use_raw_nav_cmd=false)', not wheels_moving())
 
+# 11. odometry scale (관리자 바퀴 오도메트리 보정): 파라미터를 바꾸면 그 뒤 이동량만 배율만큼 늘고 파일에 남는다
+from rclpy.parameter import Parameter  # noqa: E402
+from rclpy.parameter_client import AsyncParameterClient  # noqa: E402
+params = AsyncParameterClient(node, 'tetra_wheel_driver')
+params.wait_for_services(5.0)
+future = params.set_parameters([Parameter('odom_linear_scale', Parameter.Type.DOUBLE, 1.1),
+                                Parameter('odom_angular_scale', Parameter.Type.DOUBLE, 0.9)])
+rclpy.spin_until_future_complete(node, future, timeout_sec=5.0)
+spin_for(1.0)
+board_start = (board.x_mm, board.y_mm)
+odom_start = odoms[-1][1].pose.pose.position
+spin_for(2.0, send(0.2, 0.0))
+spin_for(1.0)
+board_dist = math.hypot(board.x_mm - board_start[0], board.y_mm - board_start[1]) / 1000.0
+odom_end = odoms[-1][1].pose.pose.position
+odom_dist = math.hypot(odom_end.x - odom_start.x, odom_end.y - odom_start.y)
+check('odom_linear_scale stretches odometry', board_dist > 0.2 and abs(odom_dist / board_dist - 1.1) < 0.01,
+      f'(board {board_dist:.3f} m, odom {odom_dist:.3f} m)')
+saved = open(SCALE_FILE).read().split() if os.path.exists(SCALE_FILE) else []
+check('scale saved to odom_scale_file', saved == ['1.1', '0.9'], f'({saved})')
+rejected = params.set_parameters([Parameter('odom_linear_scale', Parameter.Type.DOUBLE, 1.5)])
+rclpy.spin_until_future_complete(node, rejected, timeout_sec=5.0)
+check('out of range scale is rejected', rejected.result() is not None and not rejected.result().results[0].successful)
+
 # 8. shutdown: zero velocity before servo off
 spin_for(1.0, send(0.2, 0.0))
 t_sig = time.monotonic()
@@ -158,6 +186,8 @@ check('shutdown sends zero speed then servo off', zero_first, f'(tail {order[-3:
 
 node.destroy_node()
 rclpy.shutdown()
+if os.path.exists(SCALE_FILE):
+    os.remove(SCALE_FILE)
 failed = [n for n, ok in results if not ok]
 print(f'\n{len(results) - len(failed)}/{len(results)} passed', flush=True)
 sys.exit(1 if failed else 0)

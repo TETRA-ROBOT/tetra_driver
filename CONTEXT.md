@@ -53,3 +53,8 @@
     (`tetra_serial/renamed_parameter.hpp`). 새 코드와 런치 파일은 새 이름을 쓴다. `m_bSingle_TF_option` 은 외부 패키지 iahrs_driver 것이라 그대로다.
 13. **리프트와 컨베이어 명령**: 보드 CN(`conveyor_auto_move_cmd`)이 리프트, CC(`conveyor_manual_move_cmd`)가 컨베이어, LT(`turn_on_cmd`)는 LED 채널이다.
     서비스 이름의 "conveyor" 는 예전 이름을 따른 것이다.
+14. **바퀴 오도메트리 보정 배율**: 오도메트리(x, y, θ)는 구동보드가 계산한다. 드라이버는 매 주기 보드 이동량에 `odom_linear_scale`·`odom_angular_scale`
+    (0.8~1.2, 기본 1)을 곱해 다시 적분해 `/odom` 으로 낸다 (`tetra_wheel_driver/src/odom_scale.hpp`, 테스트 `test/test_odom_scale.cpp`).
+    배율 1 이면 보드 값을 그대로 낸다. 파라미터를 바꾸면 바로 쓰고 `~/.config/tetra/wheel_odom_scale.txt`(`odom_scale_file`)에 남긴다.
+    값은 관리자 화면 "바퀴 오도메트리 보정"(tetra_util/tetra_odom_calibration)이 잰다. 보드 파라미터(바퀴 지름·간격으로 보이는 P4·P5)는 뜻을 적은 문서가 없어 건드리지 않는다.
+    `wheel_radius`·`wheel_distance` 파라미터는 속도 명령 변환에만 쓰이고 오도메트리에는 영향이 없다.
