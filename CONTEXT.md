@@ -53,6 +53,8 @@
     (`tetra_serial/renamed_parameter.hpp`). 새 코드와 런치 파일은 새 이름을 쓴다. `m_bSingle_TF_option` 은 외부 패키지 iahrs_driver 것이라 그대로다.
 13. **리프트와 컨베이어 명령**: 보드 CN(`conveyor_auto_move_cmd`)이 리프트, CC(`conveyor_manual_move_cmd`)가 컨베이어, LT(`turn_on_cmd`)는 LED 채널이다.
     서비스 이름의 "conveyor" 는 예전 이름을 따른 것이다.
+    리프트 위치는 보드 ML 명령(0 = 가장 높음 ~ 764 = 가장 낮음)으로 읽는다. `lift_position_option`(기본 false, MH 브링업 true)이면 10 Hz 로 `/lift_status`(Int32)에 낸다.
+    읽기에 실패한 주기는 내지 않는다 (0 이 가장 높음이라 잘못 보인다). 웹 관제가 이 값으로 리프트 높이와 단계별 높이를 보인다.
 14. **바퀴 오도메트리 보정 배율**: 오도메트리(x, y, θ)는 구동보드가 계산한다. 드라이버는 매 주기 보드 이동량에 `odom_linear_scale`·`odom_angular_scale`
     (0.8~1.2, 기본 1)을 곱해 다시 적분해 `/odom` 으로 낸다 (`tetra_wheel_driver/src/odom_scale.hpp`, 테스트 `test/test_odom_scale.cpp`).
     배율 1 이면 보드 값을 그대로 낸다 (단, 한 번이라도 다른 배율로 적분했으면 1 로 돌아와도 이동량을 이어 더해 위치가 튀지 않는다. 보드 리셋 때 다시 맞춘다). 파라미터를 바꾸면 바로 쓰고 `~/.config/tetra/wheel_odom_scale.txt`(`odom_scale_file`)에 남긴다.

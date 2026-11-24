@@ -167,6 +167,13 @@ int m_iInput[8] = {0,};
 
 // Conveyor data
 bool m_bConveyor_option = false;
+// 리프트 모터 위치(보드 ML 명령, 0 = 가장 높음 ~ 764 = 가장 낮음)를 /lift_status 로 낸다. 리프트가 있는 MH 브링업이 켠다.
+// 예전 MH 드라이버(legacy_archive/tetra_mh_interface.cpp)가 매 주기 냈고, 웹 관제 리프트 창이 이 값으로 높이를 보인다
+bool m_bLift_position_option = false;
+int m_iLift_position = 0;
+int m_iLift_poll_count = 0;
+// 30 Hz 주기 중 3 번에 한 번(10 Hz)만 읽는다: 읽을 때마다 보드 왕복이 하나 늘어 다른 폴링이 늦어진다
+const int kLiftPollEvery = 3;
 int m_dConveyor_sensor = 0; 
 int m_iConveyor_movement = 0;
 
@@ -217,6 +224,7 @@ public:
 		strncpy(port, port_param.c_str(), sizeof(port) - 1);
 		m_bConveyor_option = tetra_serial::DeclareRenamedBool(*this, "conveyor_option", "m_bConveyor_option", false);
 		m_bUltrasonic_option = tetra_serial::DeclareRenamedBool(*this, "ultrasonic_option", "m_bUltrasonic_option", false);
+		m_bLift_position_option = this->declare_parameter("lift_position_option", false);
 		m_dUltrasonicMaxRange = this->get_parameter("ultrasonic_max_range").as_double();
 
 		// Publishers
@@ -243,6 +251,7 @@ public:
 		// Conveyor Option Publishers
 		conveyor_sensor_publisher = this->create_publisher<std_msgs::msg::Int32>("conveyor_sensor", 1);
 		conveyor_movement_publisher = this->create_publisher<std_msgs::msg::Int32>("conveyor_movement", 1);
+		lift_status_publisher = this->create_publisher<std_msgs::msg::Int32>("lift_status", 1);
 
 		// Services. Power_*·Conveyor_* 는 예전 대문자 이름도 같이 연다 (legacy_services_). 새 코드는 소문자 이름을 쓴다
 		led_control_srv = create_service<interfaces::srv::LedControl>(
@@ -377,6 +386,7 @@ public:
 	// Conveyor Option Publishers
 	rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr conveyor_sensor_publisher;
 	rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr conveyor_movement_publisher;
+	rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr lift_status_publisher;
 
 	// Pointcloud publisher without PCL
 	void RangeToCloud(const sensor_msgs::msg::Range::SharedPtr range_msg, const std::string& frame_id, rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub)
@@ -983,6 +993,18 @@ static void PublishConveyor(TETRAPowerDriver& node)
 	}
 }
 
+static void PublishLiftPosition(TETRAPowerDriver& node)
+{
+	if(!m_bLift_position_option) return;
+	if(++m_iLift_poll_count < kLiftPollEvery) return;
+	m_iLift_poll_count = 0;
+	// 읽지 못한 값(0)을 내면 가장 높은 자리로 보이므로 실패하면 내지 않는다
+	if(dssp_rs232_power_module_read_motor_position(&m_iLift_position) != 0) return;
+	std_msgs::msg::Int32 lift_status;
+	lift_status.data = m_iLift_position;
+	node.lift_status_publisher->publish(lift_status);
+}
+
 int main(int argc, char * argv[])
 {
 	rclcpp::init(argc, argv);
@@ -1030,6 +1052,7 @@ int main(int argc, char * argv[])
 		PublishGpio(*node);
 		PublishSonar(*node);
 		PublishConveyor(*node);
+		PublishLiftPosition(*node);
 
 		loop_rate.sleep();
     }
