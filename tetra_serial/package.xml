@@ -5,7 +5,7 @@
   <version>1.0.0</version>
   <description>RS232 port setup and TETRA board packet helpers shared by tetra_wheel_driver and tetra_power_driver</description>
   <maintainer email="johny@hyulimatech.co.kr">johny</maintainer>
-  <license>Apache License 2.0</license>
+  <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
