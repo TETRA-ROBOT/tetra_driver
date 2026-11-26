@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 314" width="920" height="314" font-family="-apple-system,'Segoe UI','Noto Sans KR','Malgun Gothic',sans-serif" role="img" aria-label="raw_command 와 폴링">
+<title>raw_command 와 폴링</title>
+<style>
+.card{fill:#ffffff;stroke:#d0d7de}
+.ink{fill:#1f2328}.muted{fill:#59636e}.white{fill:#ffffff}
+.node{fill:#f6f8fa;stroke:#263238;stroke-width:1.5}
+.board{fill:#263238}.boardt{fill:#ffffff}.boardm{fill:#b0bec5}
+.topic{fill:#ffffff;stroke:#8c959f}
+.wire{stroke:#263238;stroke-width:2;fill:none}
+.arrow{stroke:#59636e;stroke-width:1.5;fill:none}
+.arrowhead{fill:#59636e}
+.req{fill:#00897B}.rep{fill:#FBC02D}.rept{fill:#263238}
+.hl{fill:#00897B;fill-opacity:.14;stroke:#00897B;stroke-width:1}
+.red{fill:#E53935}
+.glow{fill:none;stroke:#00897B;stroke-width:2.5}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+@media (prefers-color-scheme: dark){
+ .card{fill:#161b22;stroke:#30363d}
+ .ink{fill:#e6edf3}.muted{fill:#9198a1}
+ .node{fill:#1f262d;stroke:#8b949e}
+ .board{fill:#37474f}.boardm{fill:#cfd8dc}
+ .topic{fill:#0d1117;stroke:#484f58}
+ .wire{stroke:#8b949e}
+ .arrow{stroke:#9198a1}.arrowhead{fill:#9198a1}
+ .hl{fill:#26a69a;fill-opacity:.22;stroke:#26a69a}
+ .glow{stroke:#26a69a}
+}
+
+@keyframes sweep{0%{transform:translateX(0)}92%,100%{transform:translateX(820px)}}
+@keyframes blink{0%,100%{opacity:.15}50%{opacity:1}}
+@keyframes tick{0%{opacity:1}12%,100%{opacity:.25}}
+.cur{animation:sweep 7s linear infinite}
+.tk{opacity:.25;animation:tick 7s linear infinite}
+.gap{animation:blink 1.6s ease-in-out infinite}
+.tick{fill:#00897B}.rawb{fill:#E53935}.waitb{fill:#FBC02D}.drainb{fill:#8c959f}
+.axis{stroke:#8c959f;stroke-width:1}.curl{stroke:#263238;stroke-width:2}
+.mask{fill:#ffffff;fill-opacity:.72}
+.gapr{fill:#E53935;fill-opacity:.07;stroke:#E53935;stroke-dasharray:4 3}
+@media (prefers-color-scheme: dark){.mask{fill:#161b22}.curl{stroke:#e6edf3}.drainb{fill:#6e7681}.tick{fill:#26a69a}}
+@media (prefers-reduced-motion: reduce){.anim{animation:none!important}}</style>
+<rect class="card" x="1" y="1" width="918" height="312" rx="14"/>
+<text class="ink" x="24" y="36" font-size="18" font-weight="700">~/raw_command 가 도는 동안 그 보드의 폴링은 멈춥니다</text>
+<text class="muted" x="24" y="58" font-size="12.5">서비스 콜백은 폴링 루프의 spin_some 안에서 불립니다. 그래서 패킷은 섞이지 않지만, 그동안 폴링 패킷이 나가지 않습니다.</text>
+<line class="axis" x1="60" y1="150" x2="880" y2="150"/>
+<line class="axis" x1="60.0" y1="150" x2="60.0" y2="155"/>
+<text class="muted" x="60.0" y="170" font-size="11" text-anchor="middle">0.0 s</text>
+<line class="axis" x1="142.0" y1="150" x2="142.0" y2="155"/>
+<line class="axis" x1="224.0" y1="150" x2="224.0" y2="155"/>
+<text class="muted" x="224.0" y="170" font-size="11" text-anchor="middle">0.2 s</text>
+<line class="axis" x1="306.0" y1="150" x2="306.0" y2="155"/>
+<line class="axis" x1="388.0" y1="150" x2="388.0" y2="155"/>
+<text class="muted" x="388.0" y="170" font-size="11" text-anchor="middle">0.4 s</text>
+<line class="axis" x1="470.0" y1="150" x2="470.0" y2="155"/>
+<line class="axis" x1="552.0" y1="150" x2="552.0" y2="155"/>
+<text class="muted" x="552.0" y="170" font-size="11" text-anchor="middle">0.6 s</text>
+<line class="axis" x1="634.0" y1="150" x2="634.0" y2="155"/>
+<line class="axis" x1="716.0" y1="150" x2="716.0" y2="155"/>
+<text class="muted" x="716.0" y="170" font-size="11" text-anchor="middle">0.8 s</text>
+<line class="axis" x1="798.0" y1="150" x2="798.0" y2="155"/>
+<line class="axis" x1="880.0" y1="150" x2="880.0" y2="155"/>
+<text class="muted" x="880.0" y="170" font-size="11" text-anchor="middle">1.0 s</text>
+<text class="muted" x="50" y="124" font-size="12" text-anchor="end">보드</text>
+<text class="muted" x="50" y="206" font-size="12" text-anchor="end">/odom</text>
+<rect class="gapr gap anim" x="224.0" y="84" width="422.3" height="134" rx="6"/>
+<rect class="tick" x="60.0" y="112" width="16.9" height="26" rx="3"/>
+<circle class="tick" cx="68.5" cy="202" r="4"/>
+<rect class="tick" x="87.3" y="112" width="16.9" height="26" rx="3"/>
+<circle class="tick" cx="95.8" cy="202" r="4"/>
+<rect class="tick" x="114.7" y="112" width="16.9" height="26" rx="3"/>
+<circle class="tick" cx="123.1" cy="202" r="4"/>
+<rect class="tick" x="142.0" y="112" width="16.9" height="26" rx="3"/>
+<circle class="tick" cx="150.5" cy="202" r="4"/>
+<rect class="tick" x="169.3" y="112" width="16.9" height="26" rx="3"/>
+<circle class="tick" cx="177.8" cy="202" r="4"/>
+<rect class="tick" x="196.7" y="112" width="16.9" height="26" rx="3"/>
+<circle class="tick" cx="205.1" cy="202" r="4"/>
+<rect class="tick" x="661.3" y="112" width="16.9" height="26" rx="3"/>
+<circle class="tick" cx="669.8" cy="202" r="4"/>
+<rect class="tick" x="688.7" y="112" width="16.9" height="26" rx="3"/>
+<circle class="tick" cx="697.1" cy="202" r="4"/>
+<rect class="tick" x="716.0" y="112" width="16.9" height="26" rx="3"/>
+<circle class="tick" cx="724.5" cy="202" r="4"/>
+<rect class="tick" x="743.3" y="112" width="16.9" height="26" rx="3"/>
+<circle class="tick" cx="751.8" cy="202" r="4"/>
+<rect class="tick" x="770.7" y="112" width="16.9" height="26" rx="3"/>
+<circle class="tick" cx="779.1" cy="202" r="4"/>
+<rect class="tick" x="798.0" y="112" width="16.9" height="26" rx="3"/>
+<circle class="tick" cx="806.5" cy="202" r="4"/>
+<rect class="tick" x="825.3" y="112" width="16.9" height="26" rx="3"/>
+<circle class="tick" cx="833.8" cy="202" r="4"/>
+<rect class="tick" x="852.7" y="112" width="16.9" height="26" rx="3"/>
+<circle class="tick" cx="861.1" cy="202" r="4"/>
+<rect class="rawb" x="224.0" y="112" width="12.3" height="26" rx="3"/>
+<rect class="waitb" x="236.3" y="112" width="246.0" height="26" rx="3"/><text class="rept" x="359.3" y="129" font-size="11.5" font-weight="700" text-anchor="middle">응답 기다림 ≤ timeout_ms (기본 300 ms)</text>
+<rect class="drainb" x="482.3" y="112" width="164.0" height="26" rx="3"/><text class="white" x="564.3" y="129" font-size="11.5" font-weight="700" text-anchor="middle">늦은 바이트 버림 ≤ 0.2 s</text>
+<text class="ink" x="224.0" y="102" font-size="11.5" font-weight="700">raw 명령 보냄</text>
+<text class="ink" x="435.1" y="234" font-size="12" font-weight="700" text-anchor="middle">이 동안 폴링 패킷·/odom 없음 (최대 timeout_ms + 0.2 s)</text>
+<clipPath id="future"><rect x="60" y="78" width="840" height="140"/></clipPath>
+<g clip-path="url(#future)"><rect class="cur anim mask" x="60" y="78" width="840" height="140"/></g>
+<g class="cur anim"><line class="curl" x1="60" y1="80" x2="60" y2="216"/></g>
+<rect class="tick" x="24" y="257" width="14" height="14" rx="3"/><text class="ink" x="44" y="268" font-size="12">폴링 (33 ms 마다)</text>
+<rect class="rawb" x="170" y="257" width="14" height="14" rx="3"/><text class="ink" x="190" y="268" font-size="12">raw 명령 보내기</text>
+<rect class="waitb" x="306" y="257" width="14" height="14" rx="3"/><text class="ink" x="326" y="268" font-size="12">응답 받기</text>
+<rect class="drainb" x="404" y="257" width="14" height="14" rx="3"/><text class="ink" x="424" y="268" font-size="12">다음 폴링과 안 섞이게 비우기</text>
+<text class="muted" x="24" y="294" font-size="12">그래서 구동 드라이버는 바퀴에 속도를 주는 중이면 거부하고, 웹 API 는 주행·도킹·태스크 중에 거부합니다. 한도(256 바이트, 2 s)를 늘리지 않습니다.</text></svg>

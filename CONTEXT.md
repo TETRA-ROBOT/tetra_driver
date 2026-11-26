@@ -9,7 +9,7 @@
 | 서브 패키지 | 주요 소스 | 역할 | 주요 통신 (Topic/Service) |
 |---|---|---|---|
 | `tetra_wheel_driver` | `tetra_wheel_driver.cpp`, `drive_module.c` | 좌/우 바퀴 모터 제어, Odometry 계산, TF 브로드캐스팅 | Sub: `cmd_vel_nav2`(Nav2 최종), `cmd_vel_manual`(조그) — `cmd_vel_nav` 는 기본 미구독<br>Pub: `/odom`, `/tf` |
-| `tetra_power_driver` | `tetra_power_driver.cpp`, `power_module.c` | 배터리, 충전 전류, 전압, Sonar 초음파, LED 제어, 비상정지(EMG), 범퍼 | Pub: `/tetra_battery`, `/tetra_power`, `/gpio_status`<br>Srv: `power_outport_cmd`, `led_cmd`, `conveyor_auto_move_cmd`(CN, 리프트), `~/raw_command` |
+| `tetra_power_driver` | `tetra_power_driver.cpp`, `power_module.c` | 배터리, 충전 전류, 전압, Sonar 초음파, LED 제어, 비상정지(EMG), 범퍼 | Pub: `/tetra_battery`, `/battery_voltage`, `/battery_current`, `/docking_status`, `/power_status`, `/gpio_status`<br>Srv: `power_outport_cmd`, `led_cmd`, `conveyor_auto_move_cmd`(CN, 리프트), `~/raw_command` |
 | `tetra_serial` | `rs232.c`, `rs232_common.c`, `rs232_raw.c` | 두 드라이버가 같이 쓰는 RS232 포트 설정·패킷 읽기/쓰기 (정적 라이브러리), raw 명령 주고받기 | - |
 
 ## 아키텍처 다이어그램
@@ -21,7 +21,7 @@
                           
   [ tetra_power_driver ] ──> RS232 ──> [ 전원 보드 (Power Board) ]
          │
-         ├──> [ /tetra_battery ], [ /tetra_power ]
+         ├──> [ /tetra_battery ], [ /battery_voltage ], [ /docking_status ]
          ├──> [ /gpio_status ]
          └──> [ Sonar PointCloud2 ]
 ```

@@ -99,7 +99,7 @@ RS232 포트 설정과 패킷 읽기·쓰기는 `tetra_serial` 패키지(`tetra_
    ```
 2. 서비스 호출 예시:
    ```bash
-   ros2 service call /power_outport_cmd interfaces/srv/PowerSetOutport "{id: 1, value: 100}"
+   ros2 service call /power_outport_cmd interfaces/srv/PowerSetOutport "{output0: 1, output1: 0, output2: 0, output3: 0, output4: 0, output5: 0, output6: 0, output7: 0}"
    ```
 3. 초음파 데이터를 읽으려면:
    ```bash
